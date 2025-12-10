@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= course.name %> - Think different Academy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; min-height: 100vh; }
+    .navbar { background: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .navbar a { color: #333; text-decoration: none; margin-left: 1.5rem; font-weight: 500; }
+    .navbar a:hover { color: #667eea; }
+    .logo { font-weight: bold; font-size: 1.5rem; color: #667eea; }
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; color: #667eea; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .course-detail { background: white; border-radius: 10px; padding: 2rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .course-detail h1 { color: #333; margin-bottom: 1rem; font-size: 2rem; }
+    .course-meta { color: #888; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .course-description { color: #555; line-height: 1.8; font-size: 1.1rem; }
+    .section { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #eee; }
+    .section h2 { color: #333; margin-bottom: 1rem; font-size: 1.3rem; }
+    .empty-section { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <span class="logo">Think different Academy</span>
+    <div>
+      <a href="/">Domů</a>
+      <a href="/courses">Kurzy</a>
+      <% if (user) { %>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/logout">Odhlásit</a>
+      <% } else { %>
+        <a href="/login">Přihlásit</a>
+      <% } %>
+    </div>
+  </nav>
+  <div class="container">
+    <a href="/courses" class="back-link">← Zpět na seznam kurzů</a>
+    
+    <div class="course-detail">
+      <h1><%= course.name %></h1>
+      <p class="course-meta">ID: <%= course.uuid %></p>
+      
+      <div class="course-description">
+        <%= course.description || course.short_description || 'Tento kurz zatím nemá popis.' %>
+      </div>
+      
+      <div class="section">
+        <h2>Materiály</h2>
+        <p class="empty-section">Žádné materiály zatím nejsou k dispozici.</p>
+      </div>
+      
+      <div class="section">
+        <h2>Kvízy</h2>
+        <p class="empty-section">Žádné kvízy zatím nejsou k dispozici.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
