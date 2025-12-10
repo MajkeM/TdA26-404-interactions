@@ -1,5 +1,5 @@
 # $schema: https://portalbush.tourde.cloud/static/schema.json
-exposedPort: 80
+exposedPort: 3000
 containers:
   - name: server
     image: registry.tourde.cloud/guunrs/server
