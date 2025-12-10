@@ -8,7 +8,7 @@ containers:
     image: registry.tourde.cloud/<slug>/server
     port: 3000
     env:
-      DATABASE_URL: mysql://root:password@localhost:3306/tda_app
+      DATABASE_URL: mysql://root:password@mysql:3306/tda_app
   - name: mysql
     image: mysql
     tag: "8.0"
