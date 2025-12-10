@@ -3,7 +3,7 @@ exposedPort: 80
 containers:
   - name: web
     image: registry.tourde.cloud/guunrs/web
-    port: 3001
+    port: 80
   - name: server
     image: registry.tourde.cloud/guunrs/server
     port: 3000
