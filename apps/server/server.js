@@ -72,6 +72,55 @@ db.exec(`
   )
 `);
 
+// Create quizzes table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS quizzes (
+    uuid TEXT PRIMARY KEY,
+    course_uuid TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (course_uuid) REFERENCES courses(uuid) ON DELETE CASCADE
+  )
+`);
+
+// Create questions table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS questions (
+    uuid TEXT PRIMARY KEY,
+    quiz_uuid TEXT NOT NULL,
+    text TEXT NOT NULL,
+    type TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    FOREIGN KEY (quiz_uuid) REFERENCES quizzes(uuid) ON DELETE CASCADE
+  )
+`);
+
+// Create answers table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS answers (
+    uuid TEXT PRIMARY KEY,
+    question_uuid TEXT NOT NULL,
+    text TEXT NOT NULL,
+    is_correct INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    FOREIGN KEY (question_uuid) REFERENCES questions(uuid) ON DELETE CASCADE
+  )
+`);
+
+// Create quiz_results table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS quiz_results (
+    uuid TEXT PRIMARY KEY,
+    quiz_uuid TEXT NOT NULL,
+    score INTEGER NOT NULL,
+    max_score INTEGER NOT NULL,
+    answers_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (quiz_uuid) REFERENCES quizzes(uuid) ON DELETE CASCADE
+  )
+`);
+
 // Seed data if empty
 const count = db.prepare('SELECT COUNT(*) as count FROM courses').get();
 if (count.count === 0) {
@@ -135,9 +184,41 @@ function formatMaterial(material) {
   return result;
 }
 
+// Helper to format question for API response
+function formatQuestion(question) {
+  const answers = db.prepare('SELECT * FROM answers WHERE question_uuid = ? ORDER BY sort_order ASC').all(question.uuid);
+  
+  return {
+    uuid: question.uuid,
+    text: question.text,
+    type: question.type,
+    answers: answers.map(a => ({
+      uuid: a.uuid,
+      text: a.text,
+      isCorrect: a.is_correct === 1
+    }))
+  };
+}
+
+// Helper to format quiz for API response
+function formatQuiz(quiz) {
+  const questions = db.prepare('SELECT * FROM questions WHERE quiz_uuid = ? ORDER BY sort_order ASC').all(quiz.uuid);
+  const completionCount = db.prepare('SELECT COUNT(*) as count FROM quiz_results WHERE quiz_uuid = ?').get(quiz.uuid).count;
+  
+  return {
+    uuid: quiz.uuid,
+    name: quiz.name,
+    description: quiz.description || '',
+    questions: questions.map(formatQuestion),
+    completionCount: completionCount,
+    createdAt: quiz.created_at
+  };
+}
+
 // Helper to format course for API response
 function formatCourse(course) {
   const materials = db.prepare('SELECT * FROM materials WHERE course_uuid = ? ORDER BY created_at DESC').all(course.uuid);
+  const quizzes = db.prepare('SELECT * FROM quizzes WHERE course_uuid = ? ORDER BY created_at DESC').all(course.uuid);
   
   return {
     uuid: course.uuid,
@@ -145,7 +226,7 @@ function formatCourse(course) {
     description: course.description || '',
     shortDescription: course.short_description || '',
     materials: materials.map(formatMaterial),
-    quizzes: [],
+    quizzes: quizzes.map(formatQuiz),
     feed: []
   };
 }
@@ -423,6 +504,228 @@ app.delete('/api/courses/:courseUuid/materials/:materialUuid', (req, res) => {
   res.status(204).send();
 });
 
+// ============ QUIZZES API ROUTES ============
+
+// GET /api/courses/:uuid/quizzes - list quizzes for a course
+app.get('/api/courses/:uuid/quizzes', (req, res) => {
+  const course = db.prepare('SELECT * FROM courses WHERE uuid = ?').get(req.params.uuid);
+  
+  if (!course) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+  
+  const quizzes = db.prepare('SELECT * FROM quizzes WHERE course_uuid = ? ORDER BY created_at DESC').all(req.params.uuid);
+  res.json(quizzes.map(formatQuiz));
+});
+
+// POST /api/courses/:uuid/quizzes - create quiz
+app.post('/api/courses/:uuid/quizzes', (req, res) => {
+  const course = db.prepare('SELECT * FROM courses WHERE uuid = ?').get(req.params.uuid);
+  
+  if (!course) {
+    return res.status(404).json({ error: 'Course not found' });
+  }
+  
+  const { name, description, questions } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Name is required' });
+  }
+  
+  const quizUuid = uuidv4();
+  db.prepare('INSERT INTO quizzes (uuid, course_uuid, name, description) VALUES (?, ?, ?, ?)')
+    .run(quizUuid, req.params.uuid, name, description || '');
+  
+  // Add questions if provided
+  if (questions && Array.isArray(questions)) {
+    questions.forEach((q, qIndex) => {
+      const questionUuid = uuidv4();
+      db.prepare('INSERT INTO questions (uuid, quiz_uuid, text, type, sort_order) VALUES (?, ?, ?, ?, ?)')
+        .run(questionUuid, quizUuid, q.text, q.type || 'single', qIndex);
+      
+      if (q.answers && Array.isArray(q.answers)) {
+        q.answers.forEach((a, aIndex) => {
+          db.prepare('INSERT INTO answers (uuid, question_uuid, text, is_correct, sort_order) VALUES (?, ?, ?, ?, ?)')
+            .run(uuidv4(), questionUuid, a.text, a.isCorrect ? 1 : 0, aIndex);
+        });
+      }
+    });
+  }
+  
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE uuid = ?').get(quizUuid);
+  res.status(201).json(formatQuiz(quiz));
+});
+
+// GET /api/courses/:courseUuid/quizzes/:quizUuid - get single quiz
+app.get('/api/courses/:courseUuid/quizzes/:quizUuid', (req, res) => {
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE uuid = ? AND course_uuid = ?')
+    .get(req.params.quizUuid, req.params.courseUuid);
+  
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz not found' });
+  }
+  
+  res.json(formatQuiz(quiz));
+});
+
+// PUT /api/courses/:courseUuid/quizzes/:quizUuid - update quiz
+app.put('/api/courses/:courseUuid/quizzes/:quizUuid', (req, res) => {
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE uuid = ? AND course_uuid = ?')
+    .get(req.params.quizUuid, req.params.courseUuid);
+  
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz not found' });
+  }
+  
+  const { name, description, questions } = req.body;
+  
+  db.prepare('UPDATE quizzes SET name = ?, description = ? WHERE uuid = ?')
+    .run(
+      name !== undefined ? name : quiz.name,
+      description !== undefined ? description : quiz.description,
+      req.params.quizUuid
+    );
+  
+  // If questions are provided, replace all questions
+  if (questions && Array.isArray(questions)) {
+    // Delete existing questions (cascade deletes answers)
+    const existingQuestions = db.prepare('SELECT uuid FROM questions WHERE quiz_uuid = ?').all(req.params.quizUuid);
+    existingQuestions.forEach(q => {
+      db.prepare('DELETE FROM answers WHERE question_uuid = ?').run(q.uuid);
+    });
+    db.prepare('DELETE FROM questions WHERE quiz_uuid = ?').run(req.params.quizUuid);
+    
+    // Insert new questions
+    questions.forEach((q, qIndex) => {
+      const questionUuid = uuidv4();
+      db.prepare('INSERT INTO questions (uuid, quiz_uuid, text, type, sort_order) VALUES (?, ?, ?, ?, ?)')
+        .run(questionUuid, req.params.quizUuid, q.text, q.type || 'single', qIndex);
+      
+      if (q.answers && Array.isArray(q.answers)) {
+        q.answers.forEach((a, aIndex) => {
+          db.prepare('INSERT INTO answers (uuid, question_uuid, text, is_correct, sort_order) VALUES (?, ?, ?, ?, ?)')
+            .run(uuidv4(), questionUuid, a.text, a.isCorrect ? 1 : 0, aIndex);
+        });
+      }
+    });
+  }
+  
+  const updated = db.prepare('SELECT * FROM quizzes WHERE uuid = ?').get(req.params.quizUuid);
+  res.json(formatQuiz(updated));
+});
+
+// DELETE /api/courses/:courseUuid/quizzes/:quizUuid - delete quiz
+app.delete('/api/courses/:courseUuid/quizzes/:quizUuid', (req, res) => {
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE uuid = ? AND course_uuid = ?')
+    .get(req.params.quizUuid, req.params.courseUuid);
+  
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz not found' });
+  }
+  
+  // Delete answers first
+  const questions = db.prepare('SELECT uuid FROM questions WHERE quiz_uuid = ?').all(req.params.quizUuid);
+  questions.forEach(q => {
+    db.prepare('DELETE FROM answers WHERE question_uuid = ?').run(q.uuid);
+  });
+  
+  // Delete questions
+  db.prepare('DELETE FROM questions WHERE quiz_uuid = ?').run(req.params.quizUuid);
+  
+  // Delete results
+  db.prepare('DELETE FROM quiz_results WHERE quiz_uuid = ?').run(req.params.quizUuid);
+  
+  // Delete quiz
+  db.prepare('DELETE FROM quizzes WHERE uuid = ?').run(req.params.quizUuid);
+  res.status(204).send();
+});
+
+// POST /api/courses/:courseUuid/quizzes/:quizUuid/submit - submit quiz answers
+app.post('/api/courses/:courseUuid/quizzes/:quizUuid/submit', (req, res) => {
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE uuid = ? AND course_uuid = ?')
+    .get(req.params.quizUuid, req.params.courseUuid);
+  
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz not found' });
+  }
+  
+  const { answers } = req.body;
+  
+  if (!answers || !Array.isArray(answers)) {
+    return res.status(400).json({ error: 'Answers array is required' });
+  }
+  
+  const questions = db.prepare('SELECT * FROM questions WHERE quiz_uuid = ? ORDER BY sort_order ASC').all(req.params.quizUuid);
+  
+  let score = 0;
+  const maxScore = questions.length;
+  const results = [];
+  
+  questions.forEach(question => {
+    const userAnswer = answers.find(a => a.questionUuid === question.uuid);
+    const correctAnswers = db.prepare('SELECT * FROM answers WHERE question_uuid = ? AND is_correct = 1').all(question.uuid);
+    const allAnswers = db.prepare('SELECT * FROM answers WHERE question_uuid = ?').all(question.uuid);
+    
+    let isCorrect = false;
+    
+    if (userAnswer) {
+      if (question.type === 'single') {
+        // Single choice - check if the selected answer is correct
+        isCorrect = correctAnswers.some(ca => ca.uuid === userAnswer.answerUuid);
+      } else if (question.type === 'multiple') {
+        // Multiple choice - check if selected answers exactly match correct answers
+        const userAnswerUuids = userAnswer.answerUuids || [];
+        const correctUuids = correctAnswers.map(ca => ca.uuid);
+        isCorrect = userAnswerUuids.length === correctUuids.length &&
+                    userAnswerUuids.every(u => correctUuids.includes(u));
+      }
+    }
+    
+    if (isCorrect) score++;
+    
+    results.push({
+      questionUuid: question.uuid,
+      questionText: question.text,
+      isCorrect,
+      correctAnswers: correctAnswers.map(ca => ({ uuid: ca.uuid, text: ca.text })),
+      allAnswers: allAnswers.map(a => ({ uuid: a.uuid, text: a.text, isCorrect: a.is_correct === 1 }))
+    });
+  });
+  
+  // Save result
+  const resultUuid = uuidv4();
+  db.prepare('INSERT INTO quiz_results (uuid, quiz_uuid, score, max_score, answers_json) VALUES (?, ?, ?, ?, ?)')
+    .run(resultUuid, req.params.quizUuid, score, maxScore, JSON.stringify(answers));
+  
+  res.json({
+    uuid: resultUuid,
+    score,
+    maxScore,
+    percentage: maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
+    results
+  });
+});
+
+// GET /api/courses/:courseUuid/quizzes/:quizUuid/results - get quiz results (lecturer only)
+app.get('/api/courses/:courseUuid/quizzes/:quizUuid/results', requireApiAuth, (req, res) => {
+  const quiz = db.prepare('SELECT * FROM quizzes WHERE uuid = ? AND course_uuid = ?')
+    .get(req.params.quizUuid, req.params.courseUuid);
+  
+  if (!quiz) {
+    return res.status(404).json({ error: 'Quiz not found' });
+  }
+  
+  const results = db.prepare('SELECT * FROM quiz_results WHERE quiz_uuid = ? ORDER BY created_at DESC').all(req.params.quizUuid);
+  
+  res.json(results.map(r => ({
+    uuid: r.uuid,
+    score: r.score,
+    maxScore: r.max_score,
+    percentage: r.max_score > 0 ? Math.round((r.score / r.max_score) * 100) : 0,
+    createdAt: r.created_at
+  })));
+});
+
 // ============ PAGE ROUTES ============
 
 // GET / - Home page with Hello TdA
@@ -453,7 +756,15 @@ app.get('/courses/:uuid', (req, res) => {
   }
   
   const materials = db.prepare('SELECT * FROM materials WHERE course_uuid = ? ORDER BY created_at DESC').all(req.params.uuid);
-  res.render('course-detail', { course, materials, user: req.session.user });
+  const quizzes = db.prepare('SELECT * FROM quizzes WHERE course_uuid = ? ORDER BY created_at DESC').all(req.params.uuid);
+  
+  // Add completion count to each quiz
+  const quizzesWithCount = quizzes.map(quiz => {
+    const count = db.prepare('SELECT COUNT(*) as count FROM quiz_results WHERE quiz_uuid = ?').get(quiz.uuid).count;
+    return { ...quiz, completionCount: count };
+  });
+  
+  res.render('course-detail', { course, materials, quizzes: quizzesWithCount, user: req.session.user });
 });
 
 // GET /login - Login page
@@ -526,7 +837,8 @@ app.get('/dashboard/courses/:uuid', requireAuth, (req, res) => {
   }
   
   const materials = db.prepare('SELECT * FROM materials WHERE course_uuid = ? ORDER BY created_at DESC').all(req.params.uuid);
-  res.render('dashboard-course', { course, materials, user: req.session.user });
+  const quizzes = db.prepare('SELECT * FROM quizzes WHERE course_uuid = ? ORDER BY created_at DESC').all(req.params.uuid);
+  res.render('dashboard-course', { course, materials, quizzes, user: req.session.user });
 });
 
 // POST /dashboard/courses/:uuid/materials - Add material from dashboard

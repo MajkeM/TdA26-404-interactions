@@ -34,6 +34,39 @@
     .material-action:hover { background: #5a6fd6; }
     .material-action.link { background: #28a745; }
     .material-action.link:hover { background: #218838; }
+    .quiz-list { list-style: none; }
+    .quiz-item { display: flex; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 0.75rem; }
+    .quiz-item:hover { background: #e9ecef; }
+    .quiz-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #ffc107; color: white; border-radius: 8px; margin-right: 1rem; font-size: 1.2rem; }
+    .quiz-info { flex: 1; }
+    .quiz-name { font-weight: 600; color: #333; margin-bottom: 0.25rem; }
+    .quiz-desc { font-size: 0.9rem; color: #666; }
+    .quiz-meta { font-size: 0.8rem; color: #888; margin-top: 0.25rem; }
+    .quiz-action { padding: 0.5rem 1rem; background: #ffc107; color: #333; text-decoration: none; border-radius: 5px; font-size: 0.9rem; font-weight: 500; }
+    .quiz-action:hover { background: #e0a800; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
+    .modal.active { display: flex; justify-content: center; align-items: flex-start; padding: 2rem; }
+    .modal-content { background: white; border-radius: 10px; padding: 2rem; max-width: 700px; width: 100%; margin: 2rem 0; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .modal-header h2 { font-size: 1.5rem; color: #333; }
+    .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; }
+    .close-btn:hover { color: #333; }
+    .question { margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; }
+    .question-text { font-weight: 600; margin-bottom: 1rem; color: #333; }
+    .question-type { font-size: 0.8rem; color: #888; margin-bottom: 0.5rem; }
+    .answer-option { display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.5rem; cursor: pointer; border-radius: 5px; }
+    .answer-option:hover { background: #e9ecef; }
+    .answer-option input { margin-right: 0.75rem; }
+    .submit-quiz { width: 100%; padding: 1rem; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 1rem; cursor: pointer; font-weight: 600; }
+    .submit-quiz:hover { background: #5a6fd6; }
+    .results-container { text-align: center; }
+    .score-display { font-size: 3rem; font-weight: bold; color: #667eea; margin: 1rem 0; }
+    .score-percent { font-size: 1.2rem; color: #666; }
+    .result-item { padding: 1rem; margin-bottom: 0.75rem; border-radius: 8px; text-align: left; }
+    .result-item.correct { background: #d4edda; border-left: 4px solid #28a745; }
+    .result-item.incorrect { background: #f8d7da; border-left: 4px solid #dc3545; }
+    .result-item .question-text { margin-bottom: 0.5rem; }
+    .correct-answer { font-size: 0.9rem; color: #28a745; }
   </style>
 </head>
 <body>
@@ -97,9 +130,181 @@
       
       <div class="section">
         <h2>Kvízy</h2>
-        <p class="empty-section">Žádné kvízy zatím nejsou k dispozici.</p>
+        <% if (quizzes && quizzes.length > 0) { %>
+          <ul class="quiz-list">
+            <% quizzes.forEach(quiz => { %>
+              <li class="quiz-item">
+                <div class="quiz-icon">📝</div>
+                <div class="quiz-info">
+                  <div class="quiz-name"><%= quiz.name %></div>
+                  <% if (quiz.description) { %>
+                    <div class="quiz-desc"><%= quiz.description %></div>
+                  <% } %>
+                  <div class="quiz-meta">Vyplněno <%= quiz.completionCount %>×</div>
+                </div>
+                <button class="quiz-action" onclick="openQuiz('<%= quiz.uuid %>')">Spustit kvíz</button>
+              </li>
+            <% }) %>
+          </ul>
+        <% } else { %>
+          <p class="empty-section">Žádné kvízy zatím nejsou k dispozici.</p>
+        <% } %>
       </div>
     </div>
   </div>
+  
+  <!-- Quiz Modal -->
+  <div id="quizModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="quizTitle">Kvíz</h2>
+        <button class="close-btn" onclick="closeQuiz()">&times;</button>
+      </div>
+      <div id="quizContent"></div>
+    </div>
+  </div>
+  
+  <script>
+    const courseUuid = '<%= course.uuid %>';
+    let currentQuiz = null;
+    
+    async function openQuiz(quizUuid) {
+      try {
+        const response = await fetch(`/api/courses/${courseUuid}/quizzes/${quizUuid}`);
+        const quiz = await response.json();
+        currentQuiz = quiz;
+        
+        document.getElementById('quizTitle').textContent = quiz.name;
+        document.getElementById('quizModal').classList.add('active');
+        
+        renderQuiz(quiz);
+      } catch (error) {
+        console.error('Error loading quiz:', error);
+        alert('Nepodařilo se načíst kvíz');
+      }
+    }
+    
+    function closeQuiz() {
+      document.getElementById('quizModal').classList.remove('active');
+      currentQuiz = null;
+    }
+    
+    function renderQuiz(quiz) {
+      const container = document.getElementById('quizContent');
+      
+      if (!quiz.questions || quiz.questions.length === 0) {
+        container.innerHTML = '<p>Tento kvíz zatím nemá žádné otázky.</p>';
+        return;
+      }
+      
+      let html = '<form id="quizForm" onsubmit="submitQuiz(event)">';
+      
+      quiz.questions.forEach((question, qIndex) => {
+        const inputType = question.type === 'single' ? 'radio' : 'checkbox';
+        const inputName = question.type === 'single' ? `question_${question.uuid}` : `question_${question.uuid}[]`;
+        
+        html += `
+          <div class="question" data-question-uuid="${question.uuid}" data-type="${question.type}">
+            <div class="question-type">${question.type === 'single' ? 'Vyberte jednu odpověď' : 'Vyberte více odpovědí'}</div>
+            <div class="question-text">${qIndex + 1}. ${question.text}</div>
+        `;
+        
+        question.answers.forEach(answer => {
+          html += `
+            <label class="answer-option">
+              <input type="${inputType}" name="${inputName}" value="${answer.uuid}">
+              ${answer.text}
+            </label>
+          `;
+        });
+        
+        html += '</div>';
+      });
+      
+      html += '<button type="submit" class="submit-quiz">Odeslat kvíz</button></form>';
+      container.innerHTML = html;
+    }
+    
+    async function submitQuiz(e) {
+      e.preventDefault();
+      
+      if (!currentQuiz) return;
+      
+      const answers = [];
+      
+      currentQuiz.questions.forEach(question => {
+        if (question.type === 'single') {
+          const selected = document.querySelector(`input[name="question_${question.uuid}"]:checked`);
+          if (selected) {
+            answers.push({ questionUuid: question.uuid, answerUuid: selected.value });
+          }
+        } else {
+          const selected = document.querySelectorAll(`input[name="question_${question.uuid}[]"]:checked`);
+          const answerUuids = Array.from(selected).map(el => el.value);
+          answers.push({ questionUuid: question.uuid, answerUuids });
+        }
+      });
+      
+      try {
+        const response = await fetch(`/api/courses/${courseUuid}/quizzes/${currentQuiz.uuid}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers })
+        });
+        
+        const result = await response.json();
+        renderResults(result);
+      } catch (error) {
+        console.error('Error submitting quiz:', error);
+        alert('Nepodařilo se odeslat kvíz');
+      }
+    }
+    
+    function renderResults(result) {
+      const container = document.getElementById('quizContent');
+      
+      let html = `
+        <div class="results-container">
+          <h3>Výsledky kvízu</h3>
+          <div class="score-display">${result.score} / ${result.maxScore}</div>
+          <div class="score-percent">${result.percentage}% správně</div>
+        </div>
+        <div style="margin-top: 1.5rem;">
+      `;
+      
+      result.results.forEach((r, index) => {
+        html += `
+          <div class="result-item ${r.isCorrect ? 'correct' : 'incorrect'}">
+            <div class="question-text">${index + 1}. ${r.questionText}</div>
+            <div class="correct-answer">
+              Správná odpověď: ${r.correctAnswers.map(a => a.text).join(', ')}
+            </div>
+          </div>
+        `;
+      });
+      
+      html += `
+        </div>
+        <button onclick="closeQuiz()" class="submit-quiz" style="margin-top: 1rem;">Zavřít</button>
+      `;
+      
+      container.innerHTML = html;
+      
+      // Refresh page to update completion count
+      setTimeout(() => {
+        if (document.getElementById('quizModal').classList.contains('active') === false) {
+          location.reload();
+        }
+      }, 100);
+    }
+    
+    // Close modal when clicking outside
+    document.getElementById('quizModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeQuiz();
+        location.reload();
+      }
+    });
+  </script>
 </body>
 </html>

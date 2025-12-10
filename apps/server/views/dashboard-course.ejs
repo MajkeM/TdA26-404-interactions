@@ -51,6 +51,34 @@
     .empty { color: #888; font-style: italic; padding: 1rem; text-align: center; }
     .alert { padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
     .alert-info { background: #e7f3ff; color: #0056b3; }
+    .quiz-list { list-style: none; }
+    .quiz-item { padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 0.75rem; }
+    .quiz-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+    .quiz-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #ffc107; color: white; border-radius: 8px; font-size: 1.2rem; flex-shrink: 0; }
+    .quiz-info { flex: 1; min-width: 200px; }
+    .quiz-name { font-weight: 600; color: #333; }
+    .quiz-desc { font-size: 0.9rem; color: #666; }
+    .quiz-meta { font-size: 0.8rem; color: #888; margin-top: 0.25rem; }
+    .quiz-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .question-item { background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 0.5rem; }
+    .question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .answer-item { padding: 0.25rem 0.5rem; margin: 0.25rem 0; font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+    .answer-item.correct { color: #28a745; font-weight: 500; }
+    .btn-warning { background: #ffc107; color: #333; }
+    .btn-warning:hover { background: #e0a800; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; overflow-y: auto; }
+    .modal.active { display: flex; justify-content: center; align-items: flex-start; padding: 2rem; }
+    .modal-content { background: white; border-radius: 10px; padding: 2rem; max-width: 800px; width: 100%; margin: 2rem 0; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .modal-header h2 { font-size: 1.5rem; color: #333; }
+    .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #888; }
+    .close-btn:hover { color: #333; }
+    .question-form { margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px; }
+    .answers-container { margin-left: 1rem; }
+    .answer-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+    .answer-row input[type="text"] { flex: 1; }
+    .results-list { max-height: 400px; overflow-y: auto; }
+    .result-row { display: flex; justify-content: space-between; padding: 0.75rem; background: #f8f9fa; border-radius: 5px; margin-bottom: 0.5rem; }
   </style>
 </head>
 <body>
@@ -184,14 +212,347 @@
         <p class="empty">Tento kurz zatím nemá žádné materiály.</p>
       <% } %>
     </div>
+    
+    <!-- Quizzes Section -->
+    <div class="card">
+      <h2>Správa kvízů</h2>
+      <button class="btn btn-warning" onclick="openQuizModal()">+ Přidat nový kvíz</button>
+      
+      <div style="margin-top: 1rem;">
+        <div id="quizzesList" class="quiz-list"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Quiz Modal -->
+  <div id="quizModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="quizModalTitle">Nový kvíz</h2>
+        <button class="close-btn" onclick="closeQuizModal()">&times;</button>
+      </div>
+      <form id="quizForm" onsubmit="saveQuiz(event)">
+        <input type="hidden" id="editQuizUuid" value="">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="quizName">Název kvízu *</label>
+          <input type="text" id="quizName" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="quizDescription">Popis</label>
+          <input type="text" id="quizDescription">
+        </div>
+        
+        <h3 style="margin-bottom: 1rem;">Otázky</h3>
+        <div id="questionsContainer"></div>
+        <button type="button" class="btn btn-secondary" onclick="addQuestion()">+ Přidat otázku</button>
+        
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+          <button type="submit" class="btn">Uložit kvíz</button>
+          <button type="button" class="btn btn-secondary" onclick="closeQuizModal()">Zrušit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Results Modal -->
+  <div id="resultsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Výsledky kvízu</h2>
+        <button class="close-btn" onclick="closeResultsModal()">&times;</button>
+      </div>
+      <div id="resultsContent" class="results-list"></div>
+    </div>
   </div>
   
   <script>
+    const courseUuid = '<%= course.uuid %>';
+    let questionCounter = 0;
+    
+    // Load quizzes on page load
+    document.addEventListener('DOMContentLoaded', loadQuizzes);
+    
+    async function loadQuizzes() {
+      try {
+        const response = await fetch(`/api/courses/${courseUuid}/quizzes`);
+        const quizzes = await response.json();
+        renderQuizzesList(quizzes);
+      } catch (error) {
+        console.error('Error loading quizzes:', error);
+      }
+    }
+    
+    function renderQuizzesList(quizzes) {
+      const container = document.getElementById('quizzesList');
+      
+      if (quizzes.length === 0) {
+        container.innerHTML = '<p class="empty">Tento kurz zatím nemá žádné kvízy.</p>';
+        return;
+      }
+      
+      container.innerHTML = quizzes.map(quiz => `
+        <div class="quiz-item">
+          <div class="quiz-header">
+            <div class="quiz-icon">📝</div>
+            <div class="quiz-info">
+              <div class="quiz-name">${quiz.name}</div>
+              ${quiz.description ? `<div class="quiz-desc">${quiz.description}</div>` : ''}
+              <div class="quiz-meta">${quiz.questions.length} otázek • Vyplněno ${quiz.completionCount}×</div>
+            </div>
+            <div class="quiz-actions">
+              <button class="btn btn-sm" onclick="editQuiz('${quiz.uuid}')">Upravit</button>
+              <button class="btn btn-secondary btn-sm" onclick="viewResults('${quiz.uuid}')">Výsledky</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteQuiz('${quiz.uuid}')">Smazat</button>
+            </div>
+          </div>
+          ${quiz.questions.length > 0 ? `
+            <div style="margin-top: 0.5rem; margin-left: 3.5rem;">
+              ${quiz.questions.slice(0, 3).map((q, i) => `
+                <div class="question-item">
+                  <div class="question-header">
+                    <strong>${i + 1}. ${q.text}</strong>
+                    <span style="font-size: 0.8rem; color: #888;">${q.type === 'single' ? 'Jedna odpověď' : 'Více odpovědí'}</span>
+                  </div>
+                  <div class="answers-container">
+                    ${q.answers.map(a => `
+                      <div class="answer-item ${a.isCorrect ? 'correct' : ''}">
+                        ${a.isCorrect ? '✓' : '○'} ${a.text}
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              `).join('')}
+              ${quiz.questions.length > 3 ? `<p style="color: #888; font-style: italic;">... a další ${quiz.questions.length - 3} otázek</p>` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+    
+    function openQuizModal() {
+      document.getElementById('editQuizUuid').value = '';
+      document.getElementById('quizModalTitle').textContent = 'Nový kvíz';
+      document.getElementById('quizName').value = '';
+      document.getElementById('quizDescription').value = '';
+      document.getElementById('questionsContainer').innerHTML = '';
+      questionCounter = 0;
+      addQuestion();
+      document.getElementById('quizModal').classList.add('active');
+    }
+    
+    function closeQuizModal() {
+      document.getElementById('quizModal').classList.remove('active');
+    }
+    
+    async function editQuiz(quizUuid) {
+      try {
+        const response = await fetch(`/api/courses/${courseUuid}/quizzes/${quizUuid}`);
+        const quiz = await response.json();
+        
+        document.getElementById('editQuizUuid').value = quiz.uuid;
+        document.getElementById('quizModalTitle').textContent = 'Upravit kvíz';
+        document.getElementById('quizName').value = quiz.name;
+        document.getElementById('quizDescription').value = quiz.description || '';
+        document.getElementById('questionsContainer').innerHTML = '';
+        questionCounter = 0;
+        
+        quiz.questions.forEach(q => {
+          addQuestion(q);
+        });
+        
+        if (quiz.questions.length === 0) {
+          addQuestion();
+        }
+        
+        document.getElementById('quizModal').classList.add('active');
+      } catch (error) {
+        console.error('Error loading quiz:', error);
+        alert('Nepodařilo se načíst kvíz');
+      }
+    }
+    
+    function addQuestion(existingQuestion = null) {
+      const container = document.getElementById('questionsContainer');
+      const qIndex = questionCounter++;
+      
+      const div = document.createElement('div');
+      div.className = 'question-form';
+      div.id = `question-${qIndex}`;
+      div.innerHTML = `
+        <div class="form-row">
+          <div class="form-group" style="flex: 2;">
+            <label>Text otázky *</label>
+            <input type="text" class="question-text" value="${existingQuestion ? existingQuestion.text : ''}" required>
+          </div>
+          <div class="form-group" style="flex: 1;">
+            <label>Typ</label>
+            <select class="question-type">
+              <option value="single" ${existingQuestion?.type === 'single' ? 'selected' : ''}>Jedna odpověď</option>
+              <option value="multiple" ${existingQuestion?.type === 'multiple' ? 'selected' : ''}>Více odpovědí</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeQuestion(${qIndex})" style="align-self: flex-end;">×</button>
+        </div>
+        <div class="answers-container" id="answers-${qIndex}">
+          <label>Odpovědi (označte správné):</label>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="addAnswer(${qIndex})" style="margin-top: 0.5rem;">+ Přidat odpověď</button>
+      `;
+      container.appendChild(div);
+      
+      if (existingQuestion && existingQuestion.answers) {
+        existingQuestion.answers.forEach(a => addAnswer(qIndex, a));
+      } else {
+        addAnswer(qIndex);
+        addAnswer(qIndex);
+      }
+    }
+    
+    function removeQuestion(qIndex) {
+      const el = document.getElementById(`question-${qIndex}`);
+      if (el) el.remove();
+    }
+    
+    let answerCounters = {};
+    function addAnswer(qIndex, existingAnswer = null) {
+      if (!answerCounters[qIndex]) answerCounters[qIndex] = 0;
+      const aIndex = answerCounters[qIndex]++;
+      
+      const container = document.getElementById(`answers-${qIndex}`);
+      const div = document.createElement('div');
+      div.className = 'answer-row';
+      div.id = `answer-${qIndex}-${aIndex}`;
+      div.innerHTML = `
+        <input type="checkbox" class="answer-correct" ${existingAnswer?.isCorrect ? 'checked' : ''}>
+        <input type="text" class="answer-text" value="${existingAnswer ? existingAnswer.text : ''}" placeholder="Text odpovědi" required>
+        <button type="button" class="btn btn-danger btn-sm" onclick="removeAnswer(${qIndex}, ${aIndex})">×</button>
+      `;
+      container.appendChild(div);
+    }
+    
+    function removeAnswer(qIndex, aIndex) {
+      const el = document.getElementById(`answer-${qIndex}-${aIndex}`);
+      if (el) el.remove();
+    }
+    
+    async function saveQuiz(e) {
+      e.preventDefault();
+      
+      const quizUuid = document.getElementById('editQuizUuid').value;
+      const name = document.getElementById('quizName').value;
+      const description = document.getElementById('quizDescription').value;
+      
+      const questions = [];
+      document.querySelectorAll('.question-form').forEach(qForm => {
+        const text = qForm.querySelector('.question-text').value;
+        const type = qForm.querySelector('.question-type').value;
+        const answers = [];
+        
+        qForm.querySelectorAll('.answer-row').forEach(aRow => {
+          const aText = aRow.querySelector('.answer-text').value;
+          const isCorrect = aRow.querySelector('.answer-correct').checked;
+          if (aText) {
+            answers.push({ text: aText, isCorrect });
+          }
+        });
+        
+        if (text && answers.length > 0) {
+          questions.push({ text, type, answers });
+        }
+      });
+      
+      const data = { name, description, questions };
+      
+      try {
+        const url = quizUuid 
+          ? `/api/courses/${courseUuid}/quizzes/${quizUuid}`
+          : `/api/courses/${courseUuid}/quizzes`;
+        
+        const response = await fetch(url, {
+          method: quizUuid ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+          closeQuizModal();
+          loadQuizzes();
+        } else {
+          const error = await response.json();
+          alert(error.error || 'Nepodařilo se uložit kvíz');
+        }
+      } catch (error) {
+        console.error('Error saving quiz:', error);
+        alert('Nepodařilo se uložit kvíz');
+      }
+    }
+    
+    async function deleteQuiz(quizUuid) {
+      if (!confirm('Opravdu smazat tento kvíz? Budou smazány i všechny výsledky.')) return;
+      
+      try {
+        const response = await fetch(`/api/courses/${courseUuid}/quizzes/${quizUuid}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          loadQuizzes();
+        } else {
+          alert('Nepodařilo se smazat kvíz');
+        }
+      } catch (error) {
+        console.error('Error deleting quiz:', error);
+        alert('Nepodařilo se smazat kvíz');
+      }
+    }
+    
+    async function viewResults(quizUuid) {
+      try {
+        const response = await fetch(`/api/courses/${courseUuid}/quizzes/${quizUuid}/results`);
+        
+        if (response.status === 401) {
+          alert('Pro zobrazení výsledků musíte být přihlášeni');
+          return;
+        }
+        
+        const results = await response.json();
+        
+        const container = document.getElementById('resultsContent');
+        
+        if (results.length === 0) {
+          container.innerHTML = '<p class="empty">Tento kvíz zatím nikdo nevyplnil.</p>';
+        } else {
+          container.innerHTML = results.map((r, i) => `
+            <div class="result-row">
+              <span>#${i + 1}</span>
+              <span><strong>${r.score} / ${r.maxScore}</strong> (${r.percentage}%)</span>
+              <span style="color: #888; font-size: 0.9rem;">${new Date(r.createdAt).toLocaleString('cs')}</span>
+            </div>
+          `).join('');
+        }
+        
+        document.getElementById('resultsModal').classList.add('active');
+      } catch (error) {
+        console.error('Error loading results:', error);
+        alert('Nepodařilo se načíst výsledky');
+      }
+    }
+    
+    function closeResultsModal() {
+      document.getElementById('resultsModal').classList.remove('active');
+    }
+    
+    // Close modals when clicking outside
+    document.getElementById('quizModal').addEventListener('click', function(e) {
+      if (e.target === this) closeQuizModal();
+    });
+    document.getElementById('resultsModal').addEventListener('click', function(e) {
+      if (e.target === this) closeResultsModal();
+    });
+    
     function toggleType(type) {
       document.getElementById('fileFields').classList.toggle('active', type === 'file');
       document.getElementById('linkFields').classList.toggle('active', type === 'url');
-      
-      // Update required attributes
       document.getElementById('file').required = (type === 'file');
       document.getElementById('url').required = (type === 'url');
     }
