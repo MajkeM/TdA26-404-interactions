@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Správa kurzu - <%= course.name %></title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; min-height: 100vh; }
+    .navbar { background: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .navbar a { color: #333; text-decoration: none; margin-left: 1.5rem; font-weight: 500; }
+    .navbar a:hover { color: #667eea; }
+    .logo { font-weight: bold; font-size: 1.5rem; color: #667eea; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+    h1 { color: #333; margin-bottom: 0.5rem; }
+    .subtitle { color: #666; margin-bottom: 2rem; }
+    .back-link { display: inline-block; margin-bottom: 1.5rem; color: #667eea; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .card { background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+    .card h2 { color: #333; margin-bottom: 1rem; font-size: 1.3rem; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; }
+    .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .form-group { flex: 1; min-width: 200px; }
+    .form-group label { display: block; margin-bottom: 0.5rem; color: #555; font-weight: 500; }
+    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .btn { padding: 0.75rem 1.5rem; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; font-weight: 500; }
+    .btn:hover { background: #5a6fd6; }
+    .btn-danger { background: #dc3545; }
+    .btn-danger:hover { background: #c82333; }
+    .btn-secondary { background: #6c757d; }
+    .btn-secondary:hover { background: #5a6268; }
+    .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.875rem; }
+    .materials-list { list-style: none; }
+    .material-item { display: flex; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+    .material-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #667eea; color: white; border-radius: 8px; font-size: 1.2rem; flex-shrink: 0; }
+    .material-icon.link { background: #28a745; }
+    .material-info { flex: 1; min-width: 200px; }
+    .material-name { font-weight: 600; color: #333; margin-bottom: 0.25rem; }
+    .material-desc { font-size: 0.9rem; color: #666; }
+    .material-meta { font-size: 0.8rem; color: #888; margin-top: 0.25rem; }
+    .material-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .material-actions form { display: inline; }
+    .type-selector { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .type-selector label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.75rem 1rem; border: 2px solid #ddd; border-radius: 5px; }
+    .type-selector input:checked + span { color: #667eea; }
+    .type-selector label:has(input:checked) { border-color: #667eea; background: #f0f3ff; }
+    .file-fields, .link-fields { display: none; }
+    .file-fields.active, .link-fields.active { display: block; }
+    .edit-form { display: none; background: #fff; padding: 1rem; border: 1px solid #ddd; border-radius: 5px; margin-top: 0.5rem; width: 100%; }
+    .edit-form.active { display: block; }
+    .empty { color: #888; font-style: italic; padding: 1rem; text-align: center; }
+    .alert { padding: 1rem; border-radius: 5px; margin-bottom: 1rem; }
+    .alert-info { background: #e7f3ff; color: #0056b3; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <span class="logo">Think different Academy</span>
+    <div>
+      <a href="/">Domů</a>
+      <a href="/courses">Kurzy</a>
+      <a href="/dashboard">Dashboard</a>
+      <a href="/logout">Odhlásit (<%= user.username %>)</a>
+    </div>
+  </nav>
+  
+  <div class="container">
+    <a href="/dashboard" class="back-link">← Zpět na dashboard</a>
+    
+    <h1><%= course.name %></h1>
+    <p class="subtitle">Správa kurzu a materiálů</p>
+    
+    <div class="card">
+      <h2>Přidat nový materiál</h2>
+      
+      <form method="POST" action="/dashboard/courses/<%= course.uuid %>/materials" enctype="multipart/form-data" id="materialForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="name">Název materiálu *</label>
+            <input type="text" id="name" name="name" required>
+          </div>
+          <div class="form-group">
+            <label for="description">Krátký popis</label>
+            <input type="text" id="description" name="description">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Typ materiálu *</label>
+          <div class="type-selector">
+            <label>
+              <input type="radio" name="type" value="file" checked onchange="toggleType('file')">
+              <span>📄 Soubor</span>
+            </label>
+            <label>
+              <input type="radio" name="type" value="link" onchange="toggleType('link')">
+              <span>🔗 Odkaz</span>
+            </label>
+          </div>
+        </div>
+        
+        <div id="fileFields" class="file-fields active">
+          <div class="form-group">
+            <label for="file">Vybrat soubor *</label>
+            <input type="file" id="file" name="file" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.gif,.mp4,.mp3">
+            <small style="color: #888; display: block; margin-top: 0.5rem;">
+              Povolené formáty: PDF, DOCX, TXT, PNG, JPG, GIF, MP4, MP3. Max. velikost: 30 MB.
+            </small>
+          </div>
+        </div>
+        
+        <div id="linkFields" class="link-fields">
+          <div class="form-group">
+            <label for="url">URL adresa *</label>
+            <input type="url" id="url" name="url" placeholder="https://...">
+          </div>
+        </div>
+        
+        <button type="submit" class="btn">Přidat materiál</button>
+      </form>
+    </div>
+    
+    <div class="card">
+      <h2>Seznam materiálů (<%= materials.length %>)</h2>
+      
+      <% if (materials.length > 0) { %>
+        <ul class="materials-list">
+          <% materials.forEach(material => { %>
+            <li class="material-item">
+              <div class="material-icon <%= material.type === 'link' ? 'link' : '' %>">
+                <% if (material.type === 'file') { %>📄<% } else { %>🔗<% } %>
+              </div>
+              <div class="material-info">
+                <div class="material-name"><%= material.name %></div>
+                <% if (material.description) { %>
+                  <div class="material-desc"><%= material.description %></div>
+                <% } %>
+                <div class="material-meta">
+                  <% if (material.type === 'file') { %>
+                    <%= material.file_name %> (<%= Math.round(material.file_size / 1024) %> KB)
+                  <% } else { %>
+                    <a href="<%= material.url %>" target="_blank"><%= material.url %></a>
+                  <% } %>
+                </div>
+              </div>
+              <div class="material-actions">
+                <% if (material.type === 'file') { %>
+                  <a href="/uploads/<%= require('path').basename(material.file_path) %>" class="btn btn-secondary btn-sm" download>Stáhnout</a>
+                <% } else { %>
+                  <a href="<%= material.url %>" class="btn btn-secondary btn-sm" target="_blank">Otevřít</a>
+                <% } %>
+                <button type="button" class="btn btn-sm" onclick="toggleEditMaterial('<%= material.uuid %>')">Upravit</button>
+                <form method="POST" action="/dashboard/courses/<%= course.uuid %>/materials/<%= material.uuid %>/delete" onsubmit="return confirm('Opravdu smazat tento materiál?');">
+                  <button type="submit" class="btn btn-danger btn-sm">Smazat</button>
+                </form>
+              </div>
+              
+              <div id="edit-<%= material.uuid %>" class="edit-form">
+                <form method="POST" action="/dashboard/courses/<%= course.uuid %>/materials/<%= material.uuid %>/edit">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label>Název</label>
+                      <input type="text" name="name" value="<%= material.name %>" required>
+                    </div>
+                    <div class="form-group">
+                      <label>Popis</label>
+                      <input type="text" name="description" value="<%= material.description || '' %>">
+                    </div>
+                  </div>
+                  <% if (material.type === 'link') { %>
+                    <div class="form-group">
+                      <label>URL</label>
+                      <input type="url" name="url" value="<%= material.url %>">
+                    </div>
+                  <% } %>
+                  <button type="submit" class="btn btn-sm">Uložit</button>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEditMaterial('<%= material.uuid %>')">Zrušit</button>
+                </form>
+              </div>
+            </li>
+          <% }) %>
+        </ul>
+      <% } else { %>
+        <p class="empty">Tento kurz zatím nemá žádné materiály.</p>
+      <% } %>
+    </div>
+  </div>
+  
+  <script>
+    function toggleType(type) {
+      document.getElementById('fileFields').classList.toggle('active', type === 'file');
+      document.getElementById('linkFields').classList.toggle('active', type === 'link');
+      
+      // Update required attributes
+      document.getElementById('file').required = (type === 'file');
+      document.getElementById('url').required = (type === 'link');
+    }
+    
+    function toggleEditMaterial(uuid) {
+      document.getElementById('edit-' + uuid).classList.toggle('active');
+    }
+  </script>
+</body>
+</html>

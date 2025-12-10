@@ -21,6 +21,19 @@
     .section { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #eee; }
     .section h2 { color: #333; margin-bottom: 1rem; font-size: 1.3rem; }
     .empty-section { color: #888; font-style: italic; }
+    .materials-list { list-style: none; }
+    .material-item { display: flex; align-items: center; padding: 1rem; background: #f8f9fa; border-radius: 8px; margin-bottom: 0.75rem; }
+    .material-item:hover { background: #e9ecef; }
+    .material-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #667eea; color: white; border-radius: 8px; margin-right: 1rem; font-size: 1.2rem; }
+    .material-icon.link { background: #28a745; }
+    .material-info { flex: 1; }
+    .material-name { font-weight: 600; color: #333; margin-bottom: 0.25rem; }
+    .material-desc { font-size: 0.9rem; color: #666; }
+    .material-meta { font-size: 0.8rem; color: #888; margin-top: 0.25rem; }
+    .material-action { padding: 0.5rem 1rem; background: #667eea; color: white; text-decoration: none; border-radius: 5px; font-size: 0.9rem; }
+    .material-action:hover { background: #5a6fd6; }
+    .material-action.link { background: #28a745; }
+    .material-action.link:hover { background: #218838; }
   </style>
 </head>
 <body>
@@ -49,8 +62,37 @@
       </div>
       
       <div class="section">
-        <h2>Materiály</h2>
-        <p class="empty-section">Žádné materiály zatím nejsou k dispozici.</p>
+        <h2>Studijní materiály</h2>
+        <% if (materials && materials.length > 0) { %>
+          <ul class="materials-list">
+            <% materials.forEach(material => { %>
+              <li class="material-item">
+                <div class="material-icon <%= material.type === 'link' ? 'link' : '' %>">
+                  <% if (material.type === 'file') { %>📄<% } else { %>🔗<% } %>
+                </div>
+                <div class="material-info">
+                  <div class="material-name"><%= material.name %></div>
+                  <% if (material.description) { %>
+                    <div class="material-desc"><%= material.description %></div>
+                  <% } %>
+                  <% if (material.type === 'file') { %>
+                    <div class="material-meta">
+                      <%= material.file_name %> 
+                      (<%= Math.round(material.file_size / 1024) %> KB)
+                    </div>
+                  <% } %>
+                </div>
+                <% if (material.type === 'file') { %>
+                  <a href="/uploads/<%= require('path').basename(material.file_path) %>" class="material-action" download>Stáhnout</a>
+                <% } else { %>
+                  <a href="<%= material.url %>" class="material-action link" target="_blank" rel="noopener">Otevřít</a>
+                <% } %>
+              </li>
+            <% }) %>
+          </ul>
+        <% } else { %>
+          <p class="empty-section">Žádné materiály zatím nejsou k dispozici.</p>
+        <% } %>
       </div>
       
       <div class="section">

@@ -10,6 +10,9 @@ RUN npm install
 COPY server.js ./
 COPY views ./views
 
+# Create uploads directory
+RUN mkdir -p /app/uploads
+
 ENV PORT=3000
 EXPOSE 3000
 
