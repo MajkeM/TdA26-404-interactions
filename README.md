@@ -6,7 +6,7 @@ A template for developing applications for the Tour de App competition with a fr
 
 ## Initial Setup
 
-In the frontend and backend directories, there are `.env.example` files that need to be renamed to `.env` and the values adjusted as needed.
+In the frontend and backend directories, there are `.env.example` files that need to be renamed to `.env` and the values adjusted as needed. The backend expects `DATABASE_URL` to be a MySQL connection string (e.g., `mysql://root:tda-root@localhost:3306/tourdeapp`).
 
 For production development, you need to set `VITE_API_URL` to the API server URL in the `tourdeapp.yaml` file to the URL you find on the main page of your project on [tourde.cloud](https://tourde.cloud/).
 
@@ -75,7 +75,7 @@ How to submit your application can be found in our [How to deploy an app to Tour
 
 ## Prvotní nastavení
 
-V složkách pro frontend a backend jsou `.env.example` soubory, které je potřeba přejmenovat na `.env` a upravit hodnoty dle potřeby.
+V složkách pro frontend a backend jsou `.env.example` soubory, které je potřeba přejmenovat na `.env` a upravit hodnoty dle potřeby. Backend očekává, že `DATABASE_URL` bude MySQL connection string (např. `mysql://root:tda-root@localhost:3306/tourdeapp`).
 
 Pro produkční vývoj je potřeba nastavit `VITE_API_URL` na URL API serveru v souboru `tourdeapp.yaml` na URL, kterou najdete na hlavní stránce Vašeho projektu na [tourde.cloud](https://tourde.cloud/).
 

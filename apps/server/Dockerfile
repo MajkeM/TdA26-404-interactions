@@ -14,7 +14,7 @@ RUN chmod +x /app/start.sh
 
 RUN npm run build
 
-ENV DATABASE_URL="file:./dev.db"
+ENV DATABASE_URL="mysql://root:tda-root@mysql:3306/tourdeapp"
 ENV PORT=3000
 
 EXPOSE 3000

@@ -8,7 +8,13 @@ containers:
     image: registry.tourde.cloud/guunrs/server
     port: 3000
     env:
-      DATABASE_URL: "file:./dev.db"
+      DATABASE_URL: "mysql://root:tda-root@mysql:3306/tourdeapp"
+  - name: mysql
+    image: mysql:8.0
+    port: 3306
+    env:
+      MYSQL_ROOT_PASSWORD: tda-root
+      MYSQL_DATABASE: tourdeapp
   - name: caddy
     image: registry.tourde.cloud/guunrs/caddy
     port: 80
