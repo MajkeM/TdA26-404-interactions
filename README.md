@@ -6,7 +6,7 @@ A template for developing applications for the Tour de App competition with a fr
 
 ## Initial Setup
 
-In the frontend and backend directories, there are `.env.example` files that need to be renamed to `.env` and the values adjusted as needed. The backend expects `DATABASE_URL` to be a MySQL connection string (e.g., `mysql://root:tda-root@localhost:3306/tourdeapp`).
+In the frontend and backend directories, there are `.env.example` files that need to be renamed to `.env` and the values adjusted as needed. The backend now uses a local SQLite database (`DATABASE_URL="file:./dev.db"` by default), so no standalone database server is required.
 
 For production development, you need to set `VITE_API_URL` to the API server URL in the `tourdeapp.yaml` file to the URL you find on the main page of your project on [tourde.cloud](https://tourde.cloud/).
 
@@ -18,7 +18,8 @@ For production development, you need to set `VITE_API_URL` to the API server URL
 For local development, you need to run:
 - **frontend** (`apps/web`), using `npm run dev` (in the correct directory - `apps/web`), it will start at [http://localhost:3001](http://localhost:3001)
 - **backend** (`apps/server`), using `npm run dev` (in the correct directory - `apps/server`), it will start at [http://localhost:3000](http://localhost:3000)
-- **MySQL** database, which is defined in `docker-compose.yaml`, using `npm run db` (in the `apps/server` directory), the database will run on port 3306
+
+The backend automatically creates and migrates a local SQLite database file, so no extra Docker services are necessary.
 
 > [!WARNING]
 > The database is not persistent, data will be lost after shutting down the Docker container.
@@ -75,7 +76,7 @@ How to submit your application can be found in our [How to deploy an app to Tour
 
 ## Prvotní nastavení
 
-V složkách pro frontend a backend jsou `.env.example` soubory, které je potřeba přejmenovat na `.env` a upravit hodnoty dle potřeby. Backend očekává, že `DATABASE_URL` bude MySQL connection string (např. `mysql://root:tda-root@localhost:3306/tourdeapp`).
+V složkách pro frontend a backend jsou `.env.example` soubory, které je potřeba přejmenovat na `.env` a upravit hodnoty dle potřeby. Backend nyní používá lokální SQLite databázi (`DATABASE_URL="file:./dev.db"`), takže není potřeba zvláštní databázový server.
 
 Pro produkční vývoj je potřeba nastavit `VITE_API_URL` na URL API serveru v souboru `tourdeapp.yaml` na URL, kterou najdete na hlavní stránce Vašeho projektu na [tourde.cloud](https://tourde.cloud/).
 
@@ -87,7 +88,8 @@ Pro produkční vývoj je potřeba nastavit `VITE_API_URL` na URL API serveru v 
 Pro lokální vývoj je potřeba pustit:
 - **frontend** (`apps/web`), pomocí `npm run dev` (ve správném adresáři - `apps/web`), pustí se na [http://localhost:3001](http://localhost:3001)
 - **backend** (`apps/server`), pomocí `npm run dev` (ve správném adresáři - `apps/server`), pustí se na [http://localhost:3000](http://localhost:3000)
-- **MySQL** databázi, která je definována v `docker-compose.yaml`, pomocí `npm run db` (v adresáři `apps/server`), databáze poběží na portu 3306
+
+Backend si sám vytvoří a migruje lokální SQLite databázi, není potřeba žádný další Docker kontejner.
 
 > [!WARNING]
 > Databáze není perzistentní, data se z ní po vypnutí Docker kontejneru ztratí.

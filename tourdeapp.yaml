@@ -1,33 +1,10 @@
 # $schema: https://portalbush.tourde.cloud/static/schema.json
 exposedPort: 80
 containers:
-  - name: web
-    image: registry.tourde.cloud/guunrs/web
-    port: 80
   - name: server
     image: registry.tourde.cloud/guunrs/server
     port: 3000
-    env:
-      DATABASE_URL: "mysql://root:tda-root@mysql:3306/tourdeapp"
-  - name: mysql
-    image: registry.tourde.cloud/guunrs/mysql
-    port: 3306
-    env:
-      MYSQL_ROOT_PASSWORD: tda-root
-      MYSQL_DATABASE: tourdeapp
-  - name: caddy
-    image: registry.tourde.cloud/guunrs/caddy
-    port: 80
 build:
-  - name: web
-    context: ./apps/web
-    dockerfile: ./apps/web/Dockerfile
   - name: server
     context: ./apps/server
     dockerfile: ./apps/server/Dockerfile
-  - name: mysql
-    context: ./apps/mysql
-    dockerfile: ./apps/mysql/Dockerfile
-  - name: caddy
-    context: ./apps/caddy
-    dockerfile: ./apps/caddy/Dockerfile
