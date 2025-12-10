@@ -1,17 +1,3 @@
-FROM node:lts-alpine
-
-WORKDIR /app
-
-# Copy package manifest and install dependencies first (cache friendly)
-COPY package.json package-lock.json* ./
-RUN npm install --production
-
-# Copy app source
-COPY . .
-
-EXPOSE 3000
-
-CMD ["npm", "start"]
 FROM node:20-alpine
 
 RUN apk add --no-cache bash netcat-openbsd
