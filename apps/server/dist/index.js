@@ -238,6 +238,28 @@ app.use((req, res, next) => {
 	res.locals.user = req.session.user ?? null;
 	next();
 });
+app.use((req, _res, next) => {
+	console.log(`[request] ${req.method} ${req.originalUrl}`);
+	if (req.method !== "GET") try {
+		console.log(`[request-body] ${JSON.stringify(req.body)}`);
+	} catch (e) {}
+	next();
+});
+app.get("/api/health", async (_req, res) => {
+	try {
+		await prisma.$queryRaw`SELECT 1`;
+		res.json({
+			status: "ok",
+			db: "ok"
+		});
+	} catch (err) {
+		console.error("health check db error", err);
+		res.status(500).json({
+			status: "error",
+			db: "error"
+		});
+	}
+});
 app.use(pages_default);
 app.use("/api", api_default);
 app.use((err, _req, res, _next) => {
@@ -247,8 +269,8 @@ app.use((err, _req, res, _next) => {
 		message: "Něco se pokazilo."
 	});
 });
-app.listen(port, () => {
-	console.log(`Server listening on http://localhost:${port}`);
+app.listen(port, "0.0.0.0", () => {
+	console.log(`Server listening on http://0.0.0.0:${port}`);
 });
 
 //#endregion
