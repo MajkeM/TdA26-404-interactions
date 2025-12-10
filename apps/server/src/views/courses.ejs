@@ -1,0 +1,21 @@
+<%- include('partials/header', { title }) %>
+<section>
+  <h1>Kurzy</h1>
+  <form class="search" method="get" action="/courses">
+    <input type="text" name="search" value="<%= search %>" placeholder="Hledat kurz" />
+    <button type="submit">Hledat</button>
+  </form>
+  <% if (!courses.length) { %>
+    <p>Žádné kurzy nenalezeny.</p>
+  <% } %>
+  <div class="cards">
+    <% courses.forEach((course) => { %>
+      <article class="card">
+        <h3><a href="/courses/<%= course.id %>"><%= course.title %></a></h3>
+        <p><%= course.shortDescription %></p>
+        <a class="btn secondary" href="/courses/<%= course.id %>">Detail</a>
+      </article>
+    <% }) %>
+  </div>
+</section>
+<%- include('partials/footer') %>

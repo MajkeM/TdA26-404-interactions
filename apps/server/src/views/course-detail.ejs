@@ -1,0 +1,15 @@
+<%- include('partials/header', { title }) %>
+<section>
+  <% if (!course) { %>
+    <p>Kurz nebyl nalezen.</p>
+    <a href="/courses" class="btn secondary">Zpět na kurzy</a>
+  <% } else { %>
+    <h1><%= course.title %></h1>
+    <p class="lead"><%= course.shortDescription %></p>
+    <div class="course-body">
+      <p><%= course.description || 'Bez popisu' %></p>
+    </div>
+    <a href="/courses" class="btn secondary">Zpět na kurzy</a>
+  <% } %>
+</section>
+<%- include('partials/footer') %>

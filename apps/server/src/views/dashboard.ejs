@@ -1,0 +1,52 @@
+<%- include('partials/header', { title }) %>
+<section class="dashboard">
+  <h1>Dashboard</h1>
+  <div class="grid">
+    <div>
+      <h2>Přidat kurz</h2>
+      <form method="post" action="/dashboard" class="form">
+        <label>Název<input name="title" required /></label>
+        <label>Krátký popis<input name="shortDescription" required /></label>
+        <label>Popis<textarea name="description" rows="4"></textarea></label>
+        <button type="submit">Vytvořit</button>
+      </form>
+    </div>
+    <div>
+      <h2>Kurzy</h2>
+      <% if (!courses.length) { %>
+        <p>Zatím žádné kurzy.</p>
+      <% } else { %>
+        <table>
+          <thead>
+            <tr>
+              <th>Název</th>
+              <th>Akce</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% courses.forEach(course => { %>
+              <tr>
+                <td>
+                  <strong><%= course.title %></strong><br />
+                  <small><%= course.shortDescription %></small>
+                </td>
+                <td class="actions">
+                  <form method="post" action="/dashboard/<%= course.id %>?_method=PUT" class="form inline">
+                    <input name="title" value="<%= course.title %>" />
+                    <input name="shortDescription" value="<%= course.shortDescription %>" />
+                    <input name="description" value="<%= course.description || '' %>" />
+                    <button type="submit">Upravit</button>
+                  </form>
+                  <form method="post" action="/dashboard/<%= course.id %>?_method=DELETE" class="inline">
+                    <button type="submit" class="danger">Smazat</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+</section>
+<%- include('partials/footer') %>

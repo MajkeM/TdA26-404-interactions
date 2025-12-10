@@ -2,3 +2,6 @@ node_modules
 .turbo
 .alchemy
 .env
+apps/server/dev.db
+apps/server/dev.db-journal
+apps/server/dist

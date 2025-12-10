@@ -1,0 +1,14 @@
+<%- include('partials/header', { title }) %>
+<section class="hero">
+  <h1>Hello TdA</h1>
+  <p>Kompletní administrace kurzů pro Tour de App Fázi 1.</p>
+  <div class="hero-actions">
+    <a class="btn" href="/courses">Prohlédnout kurzy</a>
+    <% if (!user) { %>
+      <a class="btn secondary" href="/login">Přihlásit se</a>
+    <% } else { %>
+      <a class="btn secondary" href="/dashboard">Otevřít dashboard</a>
+    <% } %>
+  </div>
+</section>
+<%- include('partials/footer') %>

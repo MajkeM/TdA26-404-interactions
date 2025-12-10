@@ -1,0 +1,19 @@
+<%- include('partials/header', { title }) %>
+<section class="auth">
+  <h1>Přihlášení</h1>
+  <% if (error) { %>
+    <p class="error"><%= error %></p>
+  <% } %>
+  <form method="post" action="/login" class="form">
+    <label>
+      Uživatelské jméno
+      <input name="username" required />
+    </label>
+    <label>
+      Heslo
+      <input type="password" name="password" required />
+    </label>
+    <button type="submit">Přihlásit</button>
+  </form>
+</section>
+<%- include('partials/footer') %>

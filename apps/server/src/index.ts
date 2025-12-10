@@ -1,27 +1,49 @@
 import "dotenv/config";
-import cors from "cors";
-import express from "express";
-import { initDatabase } from "./db/init.js";
-import { userRoutes } from "./routes/users.js";
+import path from "node:path";
+import express, { type NextFunction, type Request, type Response } from "express";
+import session from "express-session";
+import methodOverride from "method-override";
+import { PrismaClient } from "@prisma/client";
+import apiRouter from "./routes/api.js";
+import pagesRouter from "./routes/pages.js";
 
+const prisma = new PrismaClient();
 const app = express();
+const ROOT_DIR = process.cwd();
+const port = Number(process.env.PORT) || 3000;
 
-app.use(cors());
+app.set("view engine", "ejs");
+app.set("views", path.join(ROOT_DIR, "src", "views"));
+
+app.use(express.static(path.join(ROOT_DIR, "public")));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(methodOverride("_method"));
+app.use(
+	session({
+		secret: process.env.SESSION_SECRET || "tda26-session",
+		resave: false,
+		saveUninitialized: false,
+		cookie: {
+			sameSite: "lax",
+		},
+	}),
+);
 
-const apiRoutes = express.Router();
-apiRoutes.get("/", (_req, res) => {
-	res.status(200).json({ organization: "Student Cyber Games" });
+app.use((req, res, next) => {
+	req.prisma = prisma;
+	res.locals.user = req.session.user ?? null;
+	next();
 });
-apiRoutes.use("/users", userRoutes);
-app.use("/api", apiRoutes);
 
-const port = process.env.PORT || 3000;
-async function start() {
-	await initDatabase();
-	app.listen(port, () => {
-		console.log(`Server is running on port ${port}`);
-	});
-}
+app.use(pagesRouter);
+app.use("/api", apiRouter);
 
-start();
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+	console.error(err);
+	res.status(500).render("error", { title: "Chyba", message: "Něco se pokazilo." });
+});
+
+app.listen(port, () => {
+	console.log(`Server listening on http://localhost:${port}`);
+});

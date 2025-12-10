@@ -11,7 +11,11 @@
 			"@/*": ["./src/*"]
 		},
 		"outDir": "./dist",
-		"types": ["node"],
+		"types": ["node", "express", "express-session"],
+		"typeRoots": [
+			"./node_modules/@types",
+			"./src/types"
+		],
 		"composite": true,
 		"jsx": "react-jsx"
 	}
