@@ -1,20 +1,20 @@
-# Použijeme lehký Node obraz
+# Použijeme Node.js obraz
 FROM node:lts-alpine
 
-# Pracovní složka
+# Nastavíme pracovní složku
 WORKDIR /app
 
-# Nejdřív kopírujeme package.json (aby se cacheovala instalace)
+# 1. Zkopírujeme package.json
 COPY package.json ./
 
-# Nainstalujeme závislosti
+# 2. Nainstalujeme balíčky
 RUN npm install
 
-# Zkopírujeme zbytek kód (index.js)
+# 3. Zkopírujeme ZBYTEK souborů (včetně index.js)
 COPY . .
 
-# Informačně vystavíme port (reálně rozhoduje process.env.PORT v kódu)
+# Informace o portu
 EXPOSE 3000
 
-# Spustíme přes npm start
+# Spustíme aplikaci
 CMD ["npm", "start"]
