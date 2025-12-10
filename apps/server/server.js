@@ -250,8 +250,8 @@ app.get('/api/courses/:uuid/materials', (req, res) => {
   res.json(materials.map(formatMaterial));
 });
 
-// POST /api/courses/:uuid/materials - create material (protected)
-app.post('/api/courses/:uuid/materials', requireApiAuth, (req, res, next) => {
+// POST /api/courses/:uuid/materials - create material
+app.post('/api/courses/:uuid/materials', (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -339,8 +339,8 @@ app.get('/api/courses/:courseUuid/materials/:materialUuid', (req, res) => {
   res.json(formatMaterial(material));
 });
 
-// PUT /api/courses/:courseUuid/materials/:materialUuid - update material (protected)
-app.put('/api/courses/:courseUuid/materials/:materialUuid', requireApiAuth, (req, res) => {
+// PUT /api/courses/:courseUuid/materials/:materialUuid - update material
+app.put('/api/courses/:courseUuid/materials/:materialUuid', (req, res) => {
   // Handle both JSON and multipart/form-data
   upload.single('file')(req, res, (err) => {
     if (err) {
@@ -405,8 +405,8 @@ app.put('/api/courses/:courseUuid/materials/:materialUuid', requireApiAuth, (req
   });
 });
 
-// DELETE /api/courses/:courseUuid/materials/:materialUuid - delete material (protected)
-app.delete('/api/courses/:courseUuid/materials/:materialUuid', requireApiAuth, (req, res) => {
+// DELETE /api/courses/:courseUuid/materials/:materialUuid - delete material
+app.delete('/api/courses/:courseUuid/materials/:materialUuid', (req, res) => {
   const material = db.prepare('SELECT * FROM materials WHERE uuid = ? AND course_uuid = ?')
     .get(req.params.materialUuid, req.params.courseUuid);
   
