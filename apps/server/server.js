@@ -123,12 +123,13 @@ function formatMaterial(material) {
   };
   
   if (material.type === 'file') {
-    result.content = `/uploads/${path.basename(material.file_path)}`;
+    result.fileUrl = `/uploads/${path.basename(material.file_path)}`;
     result.fileName = material.file_name;
     result.fileSize = material.file_size;
     result.mimeType = material.mime_type;
   } else {
-    result.content = material.url;
+    // type === 'url'
+    result.url = material.url;
   }
   
   return result;
@@ -277,13 +278,13 @@ app.post('/api/courses/:uuid/materials', requireApiAuth, (req, res, next) => {
       return res.status(400).json({ error: 'Name is required' });
     }
     
-    if (!type || !['file', 'link'].includes(type)) {
+    if (!type || !['file', 'url'].includes(type)) {
       if (req.file) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: 'Type must be "file" or "link"' });
+      return res.status(400).json({ error: 'Type must be "file" or "url"' });
     }
     
-    if (type === 'link' && !url) {
-      return res.status(400).json({ error: 'URL is required for link type' });
+    if (type === 'url' && !url) {
+      return res.status(400).json({ error: 'URL is required for url type' });
     }
     
     if (type === 'file' && !req.file) {
@@ -314,7 +315,7 @@ app.post('/api/courses/:uuid/materials', requireApiAuth, (req, res, next) => {
       `).run(
         materialUuid,
         req.params.uuid,
-        'link',
+        'url',
         name,
         description || '',
         url
@@ -340,34 +341,68 @@ app.get('/api/courses/:courseUuid/materials/:materialUuid', (req, res) => {
 
 // PUT /api/courses/:courseUuid/materials/:materialUuid - update material (protected)
 app.put('/api/courses/:courseUuid/materials/:materialUuid', requireApiAuth, (req, res) => {
-  const material = db.prepare('SELECT * FROM materials WHERE uuid = ? AND course_uuid = ?')
-    .get(req.params.materialUuid, req.params.courseUuid);
-  
-  if (!material) {
-    return res.status(404).json({ error: 'Material not found' });
-  }
-  
-  const { name, description, url } = req.body;
-  
-  if (material.type === 'link') {
-    db.prepare('UPDATE materials SET name = ?, description = ?, url = ? WHERE uuid = ?')
-      .run(
-        name !== undefined ? name : material.name,
-        description !== undefined ? description : material.description,
-        url !== undefined ? url : material.url,
-        req.params.materialUuid
-      );
-  } else {
-    db.prepare('UPDATE materials SET name = ?, description = ? WHERE uuid = ?')
-      .run(
-        name !== undefined ? name : material.name,
-        description !== undefined ? description : material.description,
-        req.params.materialUuid
-      );
-  }
-  
-  const updated = db.prepare('SELECT * FROM materials WHERE uuid = ?').get(req.params.materialUuid);
-  res.json(formatMaterial(updated));
+  // Handle both JSON and multipart/form-data
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File too large. Maximum size is 30MB.' });
+      }
+      if (err.message === 'Unsupported file format') {
+        return res.status(400).json({ error: 'Unsupported file format' });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+    
+    const material = db.prepare('SELECT * FROM materials WHERE uuid = ? AND course_uuid = ?')
+      .get(req.params.materialUuid, req.params.courseUuid);
+    
+    if (!material) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: 'Material not found' });
+    }
+    
+    const { name, description, url } = req.body;
+    
+    if (material.type === 'url') {
+      db.prepare('UPDATE materials SET name = ?, description = ?, url = ? WHERE uuid = ?')
+        .run(
+          name !== undefined ? name : material.name,
+          description !== undefined ? description : material.description,
+          url !== undefined ? url : material.url,
+          req.params.materialUuid
+        );
+    } else {
+      // File type - check if new file was uploaded
+      if (req.file) {
+        // Delete old file
+        if (material.file_path && fs.existsSync(material.file_path)) {
+          fs.unlinkSync(material.file_path);
+        }
+        // Update with new file
+        db.prepare('UPDATE materials SET name = ?, description = ?, file_path = ?, file_name = ?, file_size = ?, mime_type = ? WHERE uuid = ?')
+          .run(
+            name !== undefined ? name : material.name,
+            description !== undefined ? description : material.description,
+            req.file.path,
+            req.file.originalname,
+            req.file.size,
+            req.file.mimetype,
+            req.params.materialUuid
+          );
+      } else {
+        // Just update metadata
+        db.prepare('UPDATE materials SET name = ?, description = ? WHERE uuid = ?')
+          .run(
+            name !== undefined ? name : material.name,
+            description !== undefined ? description : material.description,
+            req.params.materialUuid
+          );
+      }
+    }
+    
+    const updated = db.prepare('SELECT * FROM materials WHERE uuid = ?').get(req.params.materialUuid);
+    res.json(formatMaterial(updated));
+  });
 });
 
 // DELETE /api/courses/:courseUuid/materials/:materialUuid - delete material (protected)
@@ -532,14 +567,14 @@ app.post('/dashboard/courses/:uuid/materials', requireAuth, (req, res) => {
         req.file.size,
         req.file.mimetype
       );
-    } else if (type === 'link' && url) {
+    } else if (type === 'url' && url) {
       db.prepare(`
         INSERT INTO materials (uuid, course_uuid, type, name, description, url)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(
         materialUuid,
         req.params.uuid,
-        'link',
+        'url',
         name,
         description || '',
         url
@@ -572,7 +607,7 @@ app.post('/dashboard/courses/:uuid/materials/:materialUuid/edit', requireAuth, (
     .get(req.params.materialUuid, req.params.uuid);
   
   if (material) {
-    if (material.type === 'link') {
+    if (material.type === 'url') {
       db.prepare('UPDATE materials SET name = ?, description = ?, url = ? WHERE uuid = ?')
         .run(name || material.name, description || '', url || material.url, req.params.materialUuid);
     } else {

@@ -93,7 +93,7 @@
               <span>📄 Soubor</span>
             </label>
             <label>
-              <input type="radio" name="type" value="link" onchange="toggleType('link')">
+              <input type="radio" name="type" value="url" onchange="toggleType('url')">
               <span>🔗 Odkaz</span>
             </label>
           </div>
@@ -127,7 +127,7 @@
         <ul class="materials-list">
           <% materials.forEach(material => { %>
             <li class="material-item">
-              <div class="material-icon <%= material.type === 'link' ? 'link' : '' %>">
+              <div class="material-icon <%= material.type === 'url' ? 'link' : '' %>">
                 <% if (material.type === 'file') { %>📄<% } else { %>🔗<% } %>
               </div>
               <div class="material-info">
@@ -167,7 +167,7 @@
                       <input type="text" name="description" value="<%= material.description || '' %>">
                     </div>
                   </div>
-                  <% if (material.type === 'link') { %>
+                  <% if (material.type === 'url') { %>
                     <div class="form-group">
                       <label>URL</label>
                       <input type="url" name="url" value="<%= material.url %>">
@@ -189,11 +189,11 @@
   <script>
     function toggleType(type) {
       document.getElementById('fileFields').classList.toggle('active', type === 'file');
-      document.getElementById('linkFields').classList.toggle('active', type === 'link');
+      document.getElementById('linkFields').classList.toggle('active', type === 'url');
       
       // Update required attributes
       document.getElementById('file').required = (type === 'file');
-      document.getElementById('url').required = (type === 'link');
+      document.getElementById('url').required = (type === 'url');
     }
     
     function toggleEditMaterial(uuid) {

@@ -67,7 +67,7 @@
           <ul class="materials-list">
             <% materials.forEach(material => { %>
               <li class="material-item">
-                <div class="material-icon <%= material.type === 'link' ? 'link' : '' %>">
+                <div class="material-icon <%= material.type === 'url' ? 'link' : '' %>">
                   <% if (material.type === 'file') { %>📄<% } else { %>🔗<% } %>
                 </div>
                 <div class="material-info">
