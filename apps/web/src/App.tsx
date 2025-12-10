@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react'
 import './App.css'
 
 type Course = {
-  id: string
-  title: string
-  shortDescription: string
-  description?: string | null
+  uuid: string
+  name: string
+  description: string
 }
 
 function App() {
@@ -39,8 +38,8 @@ function App() {
         {!error && (
           <ul>
             {courses.map((course) => (
-              <li key={course.id}>
-                <strong>{course.title}</strong> – {course.shortDescription}
+              <li key={course.uuid}>
+                <strong>{course.name}</strong> – {course.description}
               </li>
             ))}
           </ul>
