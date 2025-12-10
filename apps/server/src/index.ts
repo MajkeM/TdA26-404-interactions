@@ -11,7 +11,7 @@ app.use(express.json());
 
 const apiRoutes = express.Router();
 apiRoutes.get("/", (_req, res) => {
-	res.status(200).send("OK");
+	res.status(200).json({ organization: "Student Cyber Games" });
 });
 apiRoutes.use("/users", userRoutes);
 app.use("/api", apiRoutes);
