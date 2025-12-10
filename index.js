@@ -1,38 +1,27 @@
 const express = require('express');
 const app = express();
 
-// Načtení portu z prostředí, nebo fallback na 3000
-const port = process.env.PORT || 3000;
+// 1. DŮLEŽITÉ: Port musíme brát z prostředí (TdA server ho tam pošle), jinak 3000
+const PORT = process.env.PORT || 3000;
 
-// Logování pro debug (uvidíš v logách kontejneru)
+// Logování každého requestu (pomůže ti vidět, co se děje v logách v Tour de Cloud)
 app.use((req, res, next) => {
-    console.log(`Příchozí request: ${req.method} ${req.url}`);
+    console.log(`[LOG] Request: ${req.method} ${req.url}`);
     next();
 });
 
-// 1. ÚKOL: HTML stránka
+// ZADÁNÍ 1: HTML na hlavní stránce
 app.get('/', (req, res) => {
-    res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>TdA App</title>
-    </head>
-    <body>
-        <h1>Hello TdA</h1>
-    </body>
-    </html>
-  `);
+    res.send('<!DOCTYPE html><html><body><h1>Hello TdA</h1></body></html>');
 });
 
-// 2. ÚKOL: API Endpoint
-// Express by default bere /api i /api/, ale pro jistotu to ošetříme
+// ZADÁNÍ 2: API JSON
+// Express automaticky zvládne /api i /api/
 app.get('/api', (req, res) => {
-    res.json({ organization: "Student Cyber Games" });
+    res.json({ "organization": "Student Cyber Games" });
 });
 
-// Spuštění serveru - DŮLEŽITÉ: '0.0.0.0'
-app.listen(port, '0.0.0.0', () => {
-    console.log(`Server běží na portu ${port} a poslouchá na 0.0.0.0`);
+// 2. DŮLEŽITÉ: '0.0.0.0' zpřístupní aplikaci zvenčí kontejneru
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`App running on port ${PORT} and host 0.0.0.0`);
 });
