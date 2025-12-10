@@ -77,8 +77,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS quizzes (
     uuid TEXT PRIMARY KEY,
     course_uuid TEXT NOT NULL,
-    name TEXT NOT NULL,
-    description TEXT,
+    title TEXT NOT NULL,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (course_uuid) REFERENCES courses(uuid) ON DELETE CASCADE
   )
@@ -89,22 +88,13 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS questions (
     uuid TEXT PRIMARY KEY,
     quiz_uuid TEXT NOT NULL,
-    text TEXT NOT NULL,
+    question TEXT NOT NULL,
     type TEXT NOT NULL,
+    options TEXT NOT NULL,
+    correct_index INTEGER,
+    correct_indices TEXT,
     sort_order INTEGER DEFAULT 0,
     FOREIGN KEY (quiz_uuid) REFERENCES quizzes(uuid) ON DELETE CASCADE
-  )
-`);
-
-// Create answers table
-db.exec(`
-  CREATE TABLE IF NOT EXISTS answers (
-    uuid TEXT PRIMARY KEY,
-    question_uuid TEXT NOT NULL,
-    text TEXT NOT NULL,
-    is_correct INTEGER DEFAULT 0,
-    sort_order INTEGER DEFAULT 0,
-    FOREIGN KEY (question_uuid) REFERENCES questions(uuid) ON DELETE CASCADE
   )
 `);
 
@@ -115,8 +105,7 @@ db.exec(`
     quiz_uuid TEXT NOT NULL,
     score INTEGER NOT NULL,
     max_score INTEGER NOT NULL,
-    answers_json TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    submitted_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (quiz_uuid) REFERENCES quizzes(uuid) ON DELETE CASCADE
   )
 `);
@@ -186,18 +175,20 @@ function formatMaterial(material) {
 
 // Helper to format question for API response
 function formatQuestion(question) {
-  const answers = db.prepare('SELECT * FROM answers WHERE question_uuid = ? ORDER BY sort_order ASC').all(question.uuid);
-  
-  return {
+  const result = {
     uuid: question.uuid,
-    text: question.text,
     type: question.type,
-    answers: answers.map(a => ({
-      uuid: a.uuid,
-      text: a.text,
-      isCorrect: a.is_correct === 1
-    }))
+    question: question.question,
+    options: JSON.parse(question.options)
   };
+  
+  if (question.type === 'singleChoice') {
+    result.correctIndex = question.correct_index;
+  } else {
+    result.correctIndices = JSON.parse(question.correct_indices || '[]');
+  }
+  
+  return result;
 }
 
 // Helper to format quiz for API response
@@ -207,8 +198,7 @@ function formatQuiz(quiz) {
   
   return {
     uuid: quiz.uuid,
-    name: quiz.name,
-    description: quiz.description || '',
+    title: quiz.title,
     questions: questions.map(formatQuestion),
     completionCount: completionCount,
     createdAt: quiz.created_at
@@ -526,29 +516,31 @@ app.post('/api/courses/:uuid/quizzes', (req, res) => {
     return res.status(404).json({ error: 'Course not found' });
   }
   
-  const { name, description, questions } = req.body;
+  const { title, questions } = req.body;
   
-  if (!name) {
-    return res.status(400).json({ error: 'Name is required' });
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
   }
   
   const quizUuid = uuidv4();
-  db.prepare('INSERT INTO quizzes (uuid, course_uuid, name, description) VALUES (?, ?, ?, ?)')
-    .run(quizUuid, req.params.uuid, name, description || '');
+  db.prepare('INSERT INTO quizzes (uuid, course_uuid, title) VALUES (?, ?, ?)')
+    .run(quizUuid, req.params.uuid, title);
   
   // Add questions if provided
   if (questions && Array.isArray(questions)) {
     questions.forEach((q, qIndex) => {
       const questionUuid = uuidv4();
-      db.prepare('INSERT INTO questions (uuid, quiz_uuid, text, type, sort_order) VALUES (?, ?, ?, ?, ?)')
-        .run(questionUuid, quizUuid, q.text, q.type || 'single', qIndex);
-      
-      if (q.answers && Array.isArray(q.answers)) {
-        q.answers.forEach((a, aIndex) => {
-          db.prepare('INSERT INTO answers (uuid, question_uuid, text, is_correct, sort_order) VALUES (?, ?, ?, ?, ?)')
-            .run(uuidv4(), questionUuid, a.text, a.isCorrect ? 1 : 0, aIndex);
-        });
-      }
+      db.prepare('INSERT INTO questions (uuid, quiz_uuid, question, type, options, correct_index, correct_indices, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(
+          questionUuid,
+          quizUuid,
+          q.question,
+          q.type || 'singleChoice',
+          JSON.stringify(q.options || []),
+          q.correctIndex !== undefined ? q.correctIndex : null,
+          q.correctIndices ? JSON.stringify(q.correctIndices) : null,
+          qIndex
+        );
     });
   }
   
@@ -577,36 +569,32 @@ app.put('/api/courses/:courseUuid/quizzes/:quizUuid', (req, res) => {
     return res.status(404).json({ error: 'Quiz not found' });
   }
   
-  const { name, description, questions } = req.body;
+  const { title, questions } = req.body;
   
-  db.prepare('UPDATE quizzes SET name = ?, description = ? WHERE uuid = ?')
-    .run(
-      name !== undefined ? name : quiz.name,
-      description !== undefined ? description : quiz.description,
-      req.params.quizUuid
-    );
+  if (title !== undefined) {
+    db.prepare('UPDATE quizzes SET title = ? WHERE uuid = ?')
+      .run(title, req.params.quizUuid);
+  }
   
   // If questions are provided, replace all questions
   if (questions && Array.isArray(questions)) {
-    // Delete existing questions (cascade deletes answers)
-    const existingQuestions = db.prepare('SELECT uuid FROM questions WHERE quiz_uuid = ?').all(req.params.quizUuid);
-    existingQuestions.forEach(q => {
-      db.prepare('DELETE FROM answers WHERE question_uuid = ?').run(q.uuid);
-    });
+    // Delete existing questions
     db.prepare('DELETE FROM questions WHERE quiz_uuid = ?').run(req.params.quizUuid);
     
     // Insert new questions
     questions.forEach((q, qIndex) => {
       const questionUuid = uuidv4();
-      db.prepare('INSERT INTO questions (uuid, quiz_uuid, text, type, sort_order) VALUES (?, ?, ?, ?, ?)')
-        .run(questionUuid, req.params.quizUuid, q.text, q.type || 'single', qIndex);
-      
-      if (q.answers && Array.isArray(q.answers)) {
-        q.answers.forEach((a, aIndex) => {
-          db.prepare('INSERT INTO answers (uuid, question_uuid, text, is_correct, sort_order) VALUES (?, ?, ?, ?, ?)')
-            .run(uuidv4(), questionUuid, a.text, a.isCorrect ? 1 : 0, aIndex);
-        });
-      }
+      db.prepare('INSERT INTO questions (uuid, quiz_uuid, question, type, options, correct_index, correct_indices, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(
+          questionUuid,
+          req.params.quizUuid,
+          q.question,
+          q.type || 'singleChoice',
+          JSON.stringify(q.options || []),
+          q.correctIndex !== undefined ? q.correctIndex : null,
+          q.correctIndices ? JSON.stringify(q.correctIndices) : null,
+          qIndex
+        );
     });
   }
   
@@ -622,12 +610,6 @@ app.delete('/api/courses/:courseUuid/quizzes/:quizUuid', (req, res) => {
   if (!quiz) {
     return res.status(404).json({ error: 'Quiz not found' });
   }
-  
-  // Delete answers first
-  const questions = db.prepare('SELECT uuid FROM questions WHERE quiz_uuid = ?').all(req.params.quizUuid);
-  questions.forEach(q => {
-    db.prepare('DELETE FROM answers WHERE question_uuid = ?').run(q.uuid);
-  });
   
   // Delete questions
   db.prepare('DELETE FROM questions WHERE quiz_uuid = ?').run(req.params.quizUuid);
@@ -659,50 +641,41 @@ app.post('/api/courses/:courseUuid/quizzes/:quizUuid/submit', (req, res) => {
   
   let score = 0;
   const maxScore = questions.length;
-  const results = [];
   
   questions.forEach(question => {
-    const userAnswer = answers.find(a => a.questionUuid === question.uuid);
-    const correctAnswers = db.prepare('SELECT * FROM answers WHERE question_uuid = ? AND is_correct = 1').all(question.uuid);
-    const allAnswers = db.prepare('SELECT * FROM answers WHERE question_uuid = ?').all(question.uuid);
+    const userAnswer = answers.find(a => a.uuid === question.uuid);
     
-    let isCorrect = false;
+    if (!userAnswer) return;
     
-    if (userAnswer) {
-      if (question.type === 'single') {
-        // Single choice - check if the selected answer is correct
-        isCorrect = correctAnswers.some(ca => ca.uuid === userAnswer.answerUuid);
-      } else if (question.type === 'multiple') {
-        // Multiple choice - check if selected answers exactly match correct answers
-        const userAnswerUuids = userAnswer.answerUuids || [];
-        const correctUuids = correctAnswers.map(ca => ca.uuid);
-        isCorrect = userAnswerUuids.length === correctUuids.length &&
-                    userAnswerUuids.every(u => correctUuids.includes(u));
+    if (question.type === 'singleChoice') {
+      // Single choice - check if the selected index is correct
+      if (userAnswer.selectedIndex === question.correct_index) {
+        score++;
+      }
+    } else if (question.type === 'multipleChoice') {
+      // Multiple choice - check if selected indices exactly match correct indices
+      const correctIndices = JSON.parse(question.correct_indices || '[]');
+      const userIndices = userAnswer.selectedIndices || [];
+      
+      if (correctIndices.length === userIndices.length &&
+          correctIndices.every(i => userIndices.includes(i)) &&
+          userIndices.every(i => correctIndices.includes(i))) {
+        score++;
       }
     }
-    
-    if (isCorrect) score++;
-    
-    results.push({
-      questionUuid: question.uuid,
-      questionText: question.text,
-      isCorrect,
-      correctAnswers: correctAnswers.map(ca => ({ uuid: ca.uuid, text: ca.text })),
-      allAnswers: allAnswers.map(a => ({ uuid: a.uuid, text: a.text, isCorrect: a.is_correct === 1 }))
-    });
   });
   
   // Save result
+  const submittedAt = new Date().toISOString();
   const resultUuid = uuidv4();
-  db.prepare('INSERT INTO quiz_results (uuid, quiz_uuid, score, max_score, answers_json) VALUES (?, ?, ?, ?, ?)')
-    .run(resultUuid, req.params.quizUuid, score, maxScore, JSON.stringify(answers));
+  db.prepare('INSERT INTO quiz_results (uuid, quiz_uuid, score, max_score, submitted_at) VALUES (?, ?, ?, ?, ?)')
+    .run(resultUuid, req.params.quizUuid, score, maxScore, submittedAt);
   
   res.json({
-    uuid: resultUuid,
+    quizUuid: req.params.quizUuid,
     score,
     maxScore,
-    percentage: maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
-    results
+    submittedAt
   });
 });
 
@@ -715,14 +688,14 @@ app.get('/api/courses/:courseUuid/quizzes/:quizUuid/results', requireApiAuth, (r
     return res.status(404).json({ error: 'Quiz not found' });
   }
   
-  const results = db.prepare('SELECT * FROM quiz_results WHERE quiz_uuid = ? ORDER BY created_at DESC').all(req.params.quizUuid);
+  const results = db.prepare('SELECT * FROM quiz_results WHERE quiz_uuid = ? ORDER BY submitted_at DESC').all(req.params.quizUuid);
   
   res.json(results.map(r => ({
     uuid: r.uuid,
     score: r.score,
     maxScore: r.max_score,
     percentage: r.max_score > 0 ? Math.round((r.score / r.max_score) * 100) : 0,
-    createdAt: r.created_at
+    submittedAt: r.submitted_at
   })));
 });
 

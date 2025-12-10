@@ -136,10 +136,7 @@
               <li class="quiz-item">
                 <div class="quiz-icon">📝</div>
                 <div class="quiz-info">
-                  <div class="quiz-name"><%= quiz.name %></div>
-                  <% if (quiz.description) { %>
-                    <div class="quiz-desc"><%= quiz.description %></div>
-                  <% } %>
+                  <div class="quiz-name"><%= quiz.title %></div>
                   <div class="quiz-meta">Vyplněno <%= quiz.completionCount %>×</div>
                 </div>
                 <button class="quiz-action" onclick="openQuiz('<%= quiz.uuid %>')">Spustit kvíz</button>
@@ -174,7 +171,7 @@
         const quiz = await response.json();
         currentQuiz = quiz;
         
-        document.getElementById('quizTitle').textContent = quiz.name;
+        document.getElementById('quizTitle').textContent = quiz.title;
         document.getElementById('quizModal').classList.add('active');
         
         renderQuiz(quiz);
@@ -200,20 +197,20 @@
       let html = '<form id="quizForm" onsubmit="submitQuiz(event)">';
       
       quiz.questions.forEach((question, qIndex) => {
-        const inputType = question.type === 'single' ? 'radio' : 'checkbox';
-        const inputName = question.type === 'single' ? `question_${question.uuid}` : `question_${question.uuid}[]`;
+        const isSingle = question.type === 'singleChoice';
+        const inputType = isSingle ? 'radio' : 'checkbox';
         
         html += `
           <div class="question" data-question-uuid="${question.uuid}" data-type="${question.type}">
-            <div class="question-type">${question.type === 'single' ? 'Vyberte jednu odpověď' : 'Vyberte více odpovědí'}</div>
-            <div class="question-text">${qIndex + 1}. ${question.text}</div>
+            <div class="question-type">${isSingle ? 'Vyberte jednu odpověď' : 'Vyberte více odpovědí'}</div>
+            <div class="question-text">${qIndex + 1}. ${question.question}</div>
         `;
         
-        question.answers.forEach(answer => {
+        question.options.forEach((option, oIndex) => {
           html += `
             <label class="answer-option">
-              <input type="${inputType}" name="${inputName}" value="${answer.uuid}">
-              ${answer.text}
+              <input type="${inputType}" name="question_${question.uuid}" value="${oIndex}">
+              ${option}
             </label>
           `;
         });
@@ -233,15 +230,17 @@
       const answers = [];
       
       currentQuiz.questions.forEach(question => {
-        if (question.type === 'single') {
+        const isSingle = question.type === 'singleChoice';
+        
+        if (isSingle) {
           const selected = document.querySelector(`input[name="question_${question.uuid}"]:checked`);
           if (selected) {
-            answers.push({ questionUuid: question.uuid, answerUuid: selected.value });
+            answers.push({ uuid: question.uuid, selectedIndex: parseInt(selected.value) });
           }
         } else {
-          const selected = document.querySelectorAll(`input[name="question_${question.uuid}[]"]:checked`);
-          const answerUuids = Array.from(selected).map(el => el.value);
-          answers.push({ questionUuid: question.uuid, answerUuids });
+          const selected = document.querySelectorAll(`input[name="question_${question.uuid}"]:checked`);
+          const selectedIndices = Array.from(selected).map(el => parseInt(el.value));
+          answers.push({ uuid: question.uuid, selectedIndices });
         }
       });
       
@@ -262,40 +261,18 @@
     
     function renderResults(result) {
       const container = document.getElementById('quizContent');
+      const percentage = result.maxScore > 0 ? Math.round((result.score / result.maxScore) * 100) : 0;
       
       let html = `
         <div class="results-container">
           <h3>Výsledky kvízu</h3>
           <div class="score-display">${result.score} / ${result.maxScore}</div>
-          <div class="score-percent">${result.percentage}% správně</div>
+          <div class="score-percent">${percentage}% správně</div>
         </div>
-        <div style="margin-top: 1.5rem;">
-      `;
-      
-      result.results.forEach((r, index) => {
-        html += `
-          <div class="result-item ${r.isCorrect ? 'correct' : 'incorrect'}">
-            <div class="question-text">${index + 1}. ${r.questionText}</div>
-            <div class="correct-answer">
-              Správná odpověď: ${r.correctAnswers.map(a => a.text).join(', ')}
-            </div>
-          </div>
-        `;
-      });
-      
-      html += `
-        </div>
-        <button onclick="closeQuiz()" class="submit-quiz" style="margin-top: 1rem;">Zavřít</button>
+        <button onclick="closeQuiz(); location.reload();" class="submit-quiz" style="margin-top: 1rem;">Zavřít</button>
       `;
       
       container.innerHTML = html;
-      
-      // Refresh page to update completion count
-      setTimeout(() => {
-        if (document.getElementById('quizModal').classList.contains('active') === false) {
-          location.reload();
-        }
-      }, 100);
     }
     
     // Close modal when clicking outside

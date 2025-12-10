@@ -234,12 +234,8 @@
       <form id="quizForm" onsubmit="saveQuiz(event)">
         <input type="hidden" id="editQuizUuid" value="">
         <div class="form-group" style="margin-bottom: 1rem;">
-          <label for="quizName">Název kvízu *</label>
-          <input type="text" id="quizName" required>
-        </div>
-        <div class="form-group" style="margin-bottom: 1rem;">
-          <label for="quizDescription">Popis</label>
-          <input type="text" id="quizDescription">
+          <label for="quizTitle">Název kvízu *</label>
+          <input type="text" id="quizTitle" required>
         </div>
         
         <h3 style="margin-bottom: 1rem;">Otázky</h3>
@@ -295,8 +291,7 @@
           <div class="quiz-header">
             <div class="quiz-icon">📝</div>
             <div class="quiz-info">
-              <div class="quiz-name">${quiz.name}</div>
-              ${quiz.description ? `<div class="quiz-desc">${quiz.description}</div>` : ''}
+              <div class="quiz-name">${quiz.title}</div>
               <div class="quiz-meta">${quiz.questions.length} otázek • Vyplněno ${quiz.completionCount}×</div>
             </div>
             <div class="quiz-actions">
@@ -310,13 +305,13 @@
               ${quiz.questions.slice(0, 3).map((q, i) => `
                 <div class="question-item">
                   <div class="question-header">
-                    <strong>${i + 1}. ${q.text}</strong>
-                    <span style="font-size: 0.8rem; color: #888;">${q.type === 'single' ? 'Jedna odpověď' : 'Více odpovědí'}</span>
+                    <strong>${i + 1}. ${q.question}</strong>
+                    <span style="font-size: 0.8rem; color: #888;">${q.type === 'singleChoice' ? 'Jedna odpověď' : 'Více odpovědí'}</span>
                   </div>
                   <div class="answers-container">
-                    ${q.answers.map(a => `
-                      <div class="answer-item ${a.isCorrect ? 'correct' : ''}">
-                        ${a.isCorrect ? '✓' : '○'} ${a.text}
+                    ${q.options.map((opt, idx) => `
+                      <div class="answer-item ${q.type === 'singleChoice' ? (idx === q.correctIndex ? 'correct' : '') : (q.correctIndices?.includes(idx) ? 'correct' : '')}">
+                        ${q.type === 'singleChoice' ? (idx === q.correctIndex ? '✓' : '○') : (q.correctIndices?.includes(idx) ? '✓' : '○')} ${opt}
                       </div>
                     `).join('')}
                   </div>
@@ -332,8 +327,7 @@
     function openQuizModal() {
       document.getElementById('editQuizUuid').value = '';
       document.getElementById('quizModalTitle').textContent = 'Nový kvíz';
-      document.getElementById('quizName').value = '';
-      document.getElementById('quizDescription').value = '';
+      document.getElementById('quizTitle').value = '';
       document.getElementById('questionsContainer').innerHTML = '';
       questionCounter = 0;
       addQuestion();
@@ -351,8 +345,7 @@
         
         document.getElementById('editQuizUuid').value = quiz.uuid;
         document.getElementById('quizModalTitle').textContent = 'Upravit kvíz';
-        document.getElementById('quizName').value = quiz.name;
-        document.getElementById('quizDescription').value = quiz.description || '';
+        document.getElementById('quizTitle').value = quiz.title;
         document.getElementById('questionsContainer').innerHTML = '';
         questionCounter = 0;
         
@@ -382,13 +375,13 @@
         <div class="form-row">
           <div class="form-group" style="flex: 2;">
             <label>Text otázky *</label>
-            <input type="text" class="question-text" value="${existingQuestion ? existingQuestion.text : ''}" required>
+            <input type="text" class="question-text" value="${existingQuestion ? existingQuestion.question : ''}" required>
           </div>
           <div class="form-group" style="flex: 1;">
             <label>Typ</label>
             <select class="question-type">
-              <option value="single" ${existingQuestion?.type === 'single' ? 'selected' : ''}>Jedna odpověď</option>
-              <option value="multiple" ${existingQuestion?.type === 'multiple' ? 'selected' : ''}>Více odpovědí</option>
+              <option value="singleChoice" ${existingQuestion?.type === 'singleChoice' ? 'selected' : ''}>Jedna odpověď</option>
+              <option value="multipleChoice" ${existingQuestion?.type === 'multipleChoice' ? 'selected' : ''}>Více odpovědí</option>
             </select>
           </div>
           <button type="button" class="btn btn-danger btn-sm" onclick="removeQuestion(${qIndex})" style="align-self: flex-end;">×</button>
@@ -400,8 +393,13 @@
       `;
       container.appendChild(div);
       
-      if (existingQuestion && existingQuestion.answers) {
-        existingQuestion.answers.forEach(a => addAnswer(qIndex, a));
+      if (existingQuestion && existingQuestion.options) {
+        existingQuestion.options.forEach((opt, idx) => {
+          const isCorrect = existingQuestion.type === 'singleChoice' 
+            ? idx === existingQuestion.correctIndex 
+            : existingQuestion.correctIndices?.includes(idx);
+          addAnswer(qIndex, { text: opt, isCorrect });
+        });
       } else {
         addAnswer(qIndex);
         addAnswer(qIndex);
@@ -439,29 +437,45 @@
       e.preventDefault();
       
       const quizUuid = document.getElementById('editQuizUuid').value;
-      const name = document.getElementById('quizName').value;
-      const description = document.getElementById('quizDescription').value;
+      const title = document.getElementById('quizTitle').value;
       
       const questions = [];
       document.querySelectorAll('.question-form').forEach(qForm => {
-        const text = qForm.querySelector('.question-text').value;
+        const questionText = qForm.querySelector('.question-text').value;
         const type = qForm.querySelector('.question-type').value;
-        const answers = [];
+        const options = [];
+        const correctIndices = [];
+        let correctIndex = null;
         
+        let idx = 0;
         qForm.querySelectorAll('.answer-row').forEach(aRow => {
           const aText = aRow.querySelector('.answer-text').value;
           const isCorrect = aRow.querySelector('.answer-correct').checked;
           if (aText) {
-            answers.push({ text: aText, isCorrect });
+            options.push(aText);
+            if (isCorrect) {
+              if (type === 'singleChoice' && correctIndex === null) {
+                correctIndex = idx;
+              } else {
+                correctIndices.push(idx);
+              }
+            }
+            idx++;
           }
         });
         
-        if (text && answers.length > 0) {
-          questions.push({ text, type, answers });
+        if (questionText && options.length > 0) {
+          const q = { question: questionText, type, options };
+          if (type === 'singleChoice') {
+            q.correctIndex = correctIndex !== null ? correctIndex : 0;
+          } else {
+            q.correctIndices = correctIndices;
+          }
+          questions.push(q);
         }
       });
       
-      const data = { name, description, questions };
+      const data = { title, questions };
       
       try {
         const url = quizUuid 
