@@ -7,8 +7,6 @@
 		"check-types": "tsc -b",
 		"dev": "tsx watch src/index.ts",
 		"start": "node dist/index.js",
-		"db": "docker compose -f docker-compose.yaml up -d",
-		"db:down": "docker compose -f docker-compose.yaml down",
 		"db:push": "prisma db push",
 		"db:seed": "node prisma/seed.js",
 		"db:sync": "npm run db:push && npm run db:seed",
