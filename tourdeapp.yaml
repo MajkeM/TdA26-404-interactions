@@ -10,7 +10,7 @@ containers:
     env:
       DATABASE_URL: "mysql://root:tda-root@mysql:3306/tourdeapp"
   - name: mysql
-    image: mysql:8.0
+    image: "mysql:8.0"
     port: 3306
     env:
       MYSQL_ROOT_PASSWORD: tda-root
