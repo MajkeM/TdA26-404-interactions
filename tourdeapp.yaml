@@ -12,11 +12,11 @@ containers:
     port: 3001
 build:
   - name: caddy
-    context: ./apps/caddy
-    dockerfile: ./apps/caddy/Dockerfile
+    context: apps/caddy
+    dockerfile: apps/caddy/Dockerfile
   - name: server
-    context: ./apps/server
-    dockerfile: ./apps/server/Dockerfile
+    context: apps/server
+    dockerfile: apps/server/Dockerfile
   - name: web
-    context: ./apps/web
-    dockerfile: ./apps/web/Dockerfile
+    context: apps/web
+    dockerfile: apps/web/Dockerfile
