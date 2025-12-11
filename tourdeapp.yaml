@@ -2,7 +2,7 @@
 exposedPort: 3000
 containers:
   - name: server
-    image: registry.tourde.cloud/guunrs/server
+    image: registry.tourde.cloud/404-interactions/server
     port: 3000
 build:
   - name: server
