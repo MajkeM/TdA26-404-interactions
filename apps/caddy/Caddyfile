@@ -1,4 +1,4 @@
 http://:80 {
     reverse_proxy /api/* server:3000
-    reverse_proxy * web:80
+    reverse_proxy * web:3001
 }
